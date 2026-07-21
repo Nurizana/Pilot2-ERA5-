@@ -49,9 +49,13 @@ ds = xr.open_dataset(output_file)
 # Standardize longitudes to 0-360 for web mapping
 ds = ds.assign_coords(longitude=(ds.longitude % 360)).sortby('longitude')
 
-# Loop through every day (timestep) in the downloaded file
-for i in range(len(ds.time)):
-    day_str = str(ds.time[i].dt.day.values).zfill(2)
+# --- THE FIX: Detect the correct time dimension name ---
+# (ERA5 NetCDF often uses 'valid_time' instead of 'time')
+time_coord = 'valid_time' if 'valid_time' in ds.coords else 'time'
+
+# Loop through every day (timestep) in the downloaded file using the correct time coordinate
+for i in range(len(ds[time_coord])):
+    day_str = str(ds[time_coord][i].dt.day.values).zfill(2)
     print(f"Processing Day {day_str}...")
 
     # --- 1. WIND (JSON) ---
@@ -63,7 +67,7 @@ for i in range(len(ds.time)):
         "dx": float(abs(ds.longitude[1] - ds.longitude[0])),
         "dy": float(abs(ds.latitude[0] - ds.latitude[1])),
         "nx": int(len(ds.longitude)), "ny": int(len(ds.latitude)),
-        "refTime": str(ds.time[i].values)
+        "refTime": str(ds[time_coord][i].values)
     }
     output_json = [
         {"header": {**header, "parameterCategory": 2, "parameterNumber": 2}, "data": u_wind.flatten().tolist()},
