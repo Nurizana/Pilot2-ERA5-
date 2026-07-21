@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ERA5 Monthly Weather Map</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/leaflet-velocity@1.6.0/dist/leaflet-velocity.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-velocity@1.6.0/dist/leaflet-velocity.min.css"/>
+    
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; overflow: hidden; }
+        #map { width: 100%; height: 100%; background: #111; }
+        #control-panel {
+            position: absolute; top: 20px; right: -300px; width: 280px; height: 90%;
+            background: rgba(30, 30, 30, 0.9); color: #fff; z-index: 1000;
+            transition: right 0.4s ease-in-out; padding: 20px; border-radius: 10px 0 0 10px;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.5); overflow-y: auto;
+        }
+        #hover-trigger { position: absolute; top: 0; right: 0; width: 50px; height: 100%; z-index: 999; }
+        #hover-trigger:hover + #control-panel, #control-panel:hover { right: 0; }
+        .panel-section { margin-bottom: 25px; border-bottom: 1px solid #444; padding-bottom: 15px; }
+        .panel-section:last-child { border-bottom: none; }
+        .panel-section h3 { margin-top: 0; font-size: 16px; color: #4da6ff; }
+        label { display: block; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
+        select, button { width: 100%; padding: 8px; margin-bottom: 10px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="hover-trigger"></div>
+
+    <div id="control-panel">
+        <div class="panel-section">
+            <h3>1. Base Map</h3>
+            <label><input type="radio" name="basemap" value="dark" checked> Night Vision (with labels)</label>
+            <label><input type="radio" name="basemap" value="ocean"> Blue Oceans (with labels)</label>
+        </div>
+
+        <div class="panel-section">
+            <h3>2. Weather Parameter</h3>
+            <label><input type="radio" name="parameter" value="none" checked> None (Base Map Only)</label>
+            <label><input type="radio" name="parameter" value="temp"> Temperature</label>
+            <label><input type="radio" name="parameter" value="geo"> Geopotential</label>
+            <label><input type="radio" name="parameter" value="rain"> Specific Rain Water Content</label>
+        </div>
+
+        <div class="panel-section">
+            <h3>3. Time Selection (00:00 UTC)</h3>
+            <select id="sel-day">
+                <!-- JavaScript will populate days 01 to 31 dynamically -->
+            </select>
+        </div>
+
+        <div class="panel-section">
+            <h3>4. Wind Overlay</h3>
+            <label><input type="checkbox" id="toggle-wind-anim"> Animated Wind Particles (850 hPa)</label>
+        </div>
+    </div>
+
+    <script>
+        // 1. Initialize Map
+        var map = L.map('map', { zoomControl: false }).setView([20, 0], 3);
+        L.control.zoom({ position: 'topleft' }).addTo(map);
+        
+        var darkMap = L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png').addTo(map);
+        var oceanMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}');
+
+        // Layer Variables
+        var currentImageLayer = null;
+        var windVelocityLayer = null;
+        var imageBounds = [[90, 0], [-90, 360]]; // Global bounds for ERA5
+
+        // Populate Day Dropdown (01 to 31)
+        var daySelect = document.getElementById('sel-day');
+        for (let i = 1; i <= 31; i++) {
+            let dayStr = (i < 10 ? '0' : '') + i;
+            let option = document.createElement('option');
+            option.value = dayStr;
+            option.text = "Day " + dayStr;
+            daySelect.appendChild(option);
+        }
+
+        // Function to load Image Overlay (Temp, Geo, Rain)
+        function updateStaticLayer() {
+            var selectedParam = $('input[name="parameter"]:checked').val();
+            var selectedDay = $('#sel-day').val();
+
+            if (currentImageLayer) {
+                map.removeLayer(currentImageLayer);
+                currentImageLayer = null;
+            }
+
+            if (selectedParam !== 'none') {
+                var imageUrl = `data/${selectedParam}_${selectedDay}.png`;
+                currentImageLayer = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.65 });
+                currentImageLayer.addTo(map);
+            }
+        }
+
+        // Function to load Wind JSON
+        function updateWindLayer() {
+            if (windVelocityLayer) {
+                map.removeLayer(windVelocityLayer);
+                windVelocityLayer = null;
+            }
+
+            if ($('#toggle-wind-anim').is(':checked')) {
+                var selectedDay = $('#sel-day').val();
+                $.getJSON(`data/wind_${selectedDay}.json`, function (data) {
+                    windVelocityLayer = L.velocityLayer({
+                        displayValues: true,
+                        displayOptions: { velocityType: 'Wind', position: 'bottomleft' },
+                        data: data, maxVelocity: 25,
+                        colorScale: ["#3288bd", "#66c2a5", "#abdda4", "#e6f598", "#fee08b", "#fdae61", "#f46d43", "#d53e4f"]
+                    });
+                    windVelocityLayer.addTo(map);
+                }).fail(function() {
+                    console.error("Wind data for day " + selectedDay + " not generated yet.");
+                });
+            }
+        }
+
+        // Event Listeners
+        $('input[name="basemap"]').change(function() {
+            if ($(this).val() === 'dark') { map.removeLayer(oceanMap); darkMap.addTo(map); } 
+            else { map.removeLayer(darkMap); oceanMap.addTo(map); }
+        });
+
+        $('input[name="parameter"]').change(updateStaticLayer);
+        $('#sel-day').change(function() {
+            updateStaticLayer();
+            updateWindLayer();
+        });
+        $('#toggle-wind-anim').change(updateWindLayer);
+
+    </script>
+</body>
+</html>
