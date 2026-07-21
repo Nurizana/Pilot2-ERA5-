@@ -1,0 +1,42 @@
+name: Update Monthly ERA5 Data
+
+on:
+  schedule:
+    - cron: '0 0 2 * *' 
+  workflow_dispatch: 
+
+permissions:
+  contents: write 
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install cdsapi xarray netCDF4 numpy matplotlib
+
+      - name: Create .cdsapirc file
+        run: |
+          echo "url: https://cds.climate.copernicus.eu/api" > ~/.cdsapirc
+          echo "key: ${{ secrets.CDS_API_KEY }}" >> ~/.cdsapirc
+
+      - name: Run data processing script
+        run: python process_data.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add data/
+          git commit -m "Automated update of daily ERA5 data" || exit 0
+          git push
