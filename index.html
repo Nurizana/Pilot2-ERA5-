@@ -3,10 +3,8 @@
 <head>
     <title>ERA5 Monthly Weather Map</title>
     <meta charset="utf-8" />
-    <!-- Ensures proper scaling on all mobile devices -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -22,7 +20,6 @@
         
         #map { width: 100%; height: 100%; z-index: 1; }
         
-        /* The main control panel container */
         #control-panel {
             position: absolute; 
             top: 20px; 
@@ -38,12 +35,10 @@
             box-shadow: -2px 0 10px rgba(0,0,0,0.5); 
         }
 
-        /* Class added via JavaScript to open the panel */
         #control-panel.open {
             transform: translateX(0);
         }
 
-        /* The trigger ribbon attached to the left side of the panel */
         #toggle-trigger { 
             position: absolute; 
             left: -50px;
@@ -67,7 +62,6 @@
             -webkit-user-select: none;
         }
 
-        /* Scrollable content area inside the panel */
         .panel-content {
             padding: 20px;
             height: 100%;
@@ -80,7 +74,6 @@
         .panel-section h3 { margin-top: 0; font-size: 16px; color: #4da6ff; }
         label { display: block; margin-bottom: 12px; cursor: pointer; font-size: 14px; }
         
-        /* Custom Hover Pop-up Time Selection */
         .custom-time-selector {
             display: flex;
             flex-direction: column;
@@ -93,7 +86,6 @@
             position: relative;
         }
 
-        /* Adjust z-index so top dropdowns overlap bottom ones */
         #row-year { z-index: 4; }
         #row-month { z-index: 3; }
         #row-day { z-index: 2; }
@@ -110,7 +102,6 @@
             position: relative;
         }
 
-        /* The blue highlighted button */
         .time-selected {
             background: #4da6ff;
             color: #000;
@@ -128,7 +119,6 @@
             background: #66b5ff;
         }
 
-        /* The pop-up list hidden by default, shown on hover */
         .time-list {
             position: absolute;
             top: 100%;
@@ -140,27 +130,18 @@
             border: 1px solid #555;
             border-top: none;
             border-radius: 0 0 4px 4px;
-            display: none; /* Hidden by default */
+            display: none; 
             box-shadow: 0 4px 10px rgba(0,0,0,0.6);
             scrollbar-width: thin;
         }
 
-        /* Show the pop-up list when hovering over the container */
         .time-dropdown-container:hover .time-list {
             display: block;
         }
         
-        /* Custom Scrollbar */
-        .time-list::-webkit-scrollbar {
-            width: 6px;
-        }
-        .time-list::-webkit-scrollbar-thumb {
-            background: #666;
-            border-radius: 3px;
-        }
-        .time-list::-webkit-scrollbar-track {
-            background: #222;
-        }
+        .time-list::-webkit-scrollbar { width: 6px; }
+        .time-list::-webkit-scrollbar-thumb { background: #666; border-radius: 3px; }
+        .time-list::-webkit-scrollbar-track { background: #222; }
 
         .time-item {
             padding: 8px;
@@ -173,28 +154,15 @@
             border-bottom: 1px solid #333;
         }
 
-        .time-item:last-child {
-            border-bottom: none;
-        }
-
-        .time-item:hover {
-            background: #333;
-            color: #fff;
-        }
-
-        .time-item.active {
-            background: #4da6ff;
-            color: #000;
-            font-weight: bold;
-        }
+        .time-item:last-child { border-bottom: none; }
+        .time-item:hover { background: #333; color: #fff; }
+        .time-item.active { background: #4da6ff; color: #000; font-weight: bold; }
     </style>
 </head>
 <body>
     <div id="map"></div>
     
-    <!-- Control Panel -->
     <div id="control-panel">
-        <!-- Trigger attached directly to the panel -->
         <div id="toggle-trigger">OPTIONS</div>
         
         <div class="panel-content">
@@ -207,7 +175,6 @@
             <div class="panel-section">
                 <h3>2. Time Selection</h3>
                 <div class="custom-time-selector">
-                    
                     <div class="time-row" id="row-year">
                         <div class="time-label">Year:</div>
                         <div class="time-dropdown-container">
@@ -239,7 +206,6 @@
                             <div class="time-list" id="list-time"></div>
                         </div>
                     </div>
-
                 </div>
             </div>
 
@@ -260,57 +226,40 @@
     </div>
 
     <script>
-        // --- UI Interactions for Mobile/Desktop ---
         var panel = document.getElementById('control-panel');
         var trigger = document.getElementById('toggle-trigger');
 
-        // Toggle panel open/close on trigger click/tap
         trigger.addEventListener('click', function(e) {
             panel.classList.toggle('open');
-            e.stopPropagation(); // Prevent map click event from firing immediately
+            e.stopPropagation(); 
         });
 
-        // 1. Initialize Map - Centered on ASEAN Countries
         var map = L.map('map', { zoomControl: false }).setView([5.0, 114.0], 5);
         L.control.zoom({ position: 'topleft' }).addTo(map);
 
-        // Close panel when tapping/clicking anywhere on the map (Mobile friendly UX)
         map.on('click', function() {
             if (panel.classList.contains('open')) {
                 panel.classList.remove('open');
             }
         });
 
-        // Prevent map clicks when interacting with the panel contents
-        panel.addEventListener('click', function(e) {
-            e.stopPropagation();
-        });
+        panel.addEventListener('click', function(e) { e.stopPropagation(); });
         
-        // --- ESRI DARK BASE MAP (Base + Labels combined) ---
         var darkBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}');
         var darkLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}');
         var darkMap = L.layerGroup([darkBase, darkLabels]);
 
-        // --- ESRI OCEAN BASE MAP (Base + Labels combined) ---
         var oceanBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}');
         var oceanLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}');
         var oceanMap = L.layerGroup([oceanBase, oceanLabels]);
 
-        // Add Default Base Map
         darkMap.addTo(map);
 
-        // Layer Variables
         var currentImageLayer = null;
         var windVelocityLayer = null;
-        var imageBounds = [[90, 0], [-90, 360]]; // Global bounds for ERA5
+        var imageBounds = [[90, 0], [-90, 360]]; 
 
-        // --- Custom Time Selection State & Logic ---
-        let timeState = {
-            year: '2026',
-            month: '01',
-            day: '01',
-            time: '00'
-        };
+        let timeState = { year: '2026', month: '01', day: '01', time: '00' };
 
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const timeOptions = [
@@ -320,18 +269,14 @@
             { val: '18', label: '18:00/02:00' }
         ];
 
-        // Generic function to render a list and update the display box
         function renderList(containerId, displayId, items, selectedValue, onSelect) {
             const container = document.getElementById(containerId);
             const display = document.getElementById(displayId);
             container.innerHTML = '';
-            
             let selectedLabel = '';
 
             items.forEach(item => {
-                if (item.value === selectedValue) {
-                    selectedLabel = item.label;
-                }
+                if (item.value === selectedValue) { selectedLabel = item.label; }
                 
                 let div = document.createElement('div');
                 div.className = 'time-item' + (item.value === selectedValue ? ' active' : '');
@@ -339,22 +284,16 @@
                 div.dataset.value = item.value;
                 
                 div.onclick = function() {
-                    // Temporarily hide the dropdown on click for better UX
                     container.style.display = 'none';
                     setTimeout(() => container.style.display = '', 100); 
-
                     onSelect(item.value, item.label);
                 };
                 container.appendChild(div);
             });
 
-            // Update the text in the main blue display box
-            if (selectedLabel) {
-                display.innerText = selectedLabel;
-            }
+            if (selectedLabel) { display.innerText = selectedLabel; }
         }
 
-        // Fast update for active class and display box without re-rendering everything
         function updateActiveSelection(containerId, displayId, selectedValue, selectedLabel) {
             const container = document.getElementById(containerId);
             const display = document.getElementById(displayId);
@@ -365,7 +304,6 @@
             for (let item of items) {
                 if (item.dataset.value === selectedValue) {
                     item.classList.add('active');
-                    // Scroll the newly active item into view
                     item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                 } else {
                     item.classList.remove('active');
@@ -373,7 +311,6 @@
             }
         }
 
-        // Updates maximum allowable days depending on leap years and chosen month
         function updateDaysList() {
             let maxDays = new Date(parseInt(timeState.year), parseInt(timeState.month), 0).getDate();
             
@@ -394,12 +331,9 @@
             });
         }
 
-        // Initialize all the lists
         function initTimeSelectors() {
             let years = [];
-            for (let i = 2026; i >= 2020; i--) {
-                years.push({ label: i.toString(), value: i.toString() });
-            }
+            for (let i = 2026; i >= 2020; i--) { years.push({ label: i.toString(), value: i.toString() }); }
             
             let months = monthNames.map((m, i) => {
                 let val = (i + 1).toString().padStart(2, '0');
@@ -431,16 +365,12 @@
             updateDaysList(); 
         }
 
-        // Start initialization
         initTimeSelectors();
 
-        // Single execution pathway to trigger map data reload
         function triggerMapUpdate() {
             updateStaticLayer();
             updateWindLayer();
         }
-
-        // --- Map Update Functions ---
 
         function updateStaticLayer() {
             var selectedParam = $('input[name="parameter"]:checked').val();
@@ -454,18 +384,11 @@
                 currentImageLayer = null;
             }
 
-            // FIX: Only attempt to load a PNG if the parameter is temp, geo, or rain.
-            if (selectedParam === 'temp' || selectedParam === 'geo' || selectedParam === 'rain') {
+            // FIX: Treats 'wind' just like the other images now!
+            if (selectedParam !== 'none') {
                 var imageUrl = `data/${selectedParam}_${y}${m}${d}_${t}.png`;
                 currentImageLayer = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.65 });
                 currentImageLayer.addTo(map);
-            }
-            
-            // FIX: If the user selects the "Wind Layer" radio button, automatically
-            // check the animated wind overlay box and draw the JSON wind particles.
-            if (selectedParam === 'wind') {
-                $('#toggle-wind-anim').prop('checked', true);
-                updateWindLayer();
             }
         }
 
@@ -497,7 +420,6 @@
             }
         }
 
-        // --- Event Listeners for Base Map & Parameter Changes ---
         $('input[name="basemap"]').change(function() {
             if ($(this).val() === 'dark') { 
                 map.removeLayer(oceanMap); 
