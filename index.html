@@ -27,7 +27,7 @@
             position: absolute; 
             top: 20px; 
             right: 0; 
-            width: 320px; /* Slightly wider to accommodate custom rolling lists */
+            width: 320px;
             height: calc(100% - 40px);
             background: rgba(30, 30, 30, 0.95); 
             color: #fff; 
@@ -80,36 +80,77 @@
         .panel-section h3 { margin-top: 0; font-size: 16px; color: #4da6ff; }
         label { display: block; margin-bottom: 12px; cursor: pointer; font-size: 14px; }
         
-        /* Custom Rolling Time Selection Grid */
+        /* Custom Hover Pop-up Time Selection */
         .custom-time-selector {
             display: flex;
             flex-direction: column;
-            gap: 15px;
+            gap: 12px;
         }
         
         .time-row {
             display: flex;
-            align-items: flex-start;
+            align-items: center;
+            position: relative;
         }
 
+        /* Adjust z-index so top dropdowns overlap bottom ones */
+        #row-year { z-index: 4; }
+        #row-month { z-index: 3; }
+        #row-day { z-index: 2; }
+        #row-time { z-index: 1; }
+
         .time-label {
-            width: 130px;
+            width: 120px;
             font-size: 14px;
-            padding-top: 8px;
             color: #ddd;
         }
 
-        .time-list {
+        .time-dropdown-container {
             flex: 1;
-            height: 110px; /* Gives the rolling capability visual */
+            position: relative;
+        }
+
+        /* The blue highlighted button */
+        .time-selected {
+            background: #4da6ff;
+            color: #000;
+            font-weight: bold;
+            font-size: 14px;
+            padding: 8px;
+            text-align: center;
+            border-radius: 4px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+        }
+
+        .time-selected:hover {
+            background: #66b5ff;
+        }
+
+        /* The pop-up list hidden by default, shown on hover */
+        .time-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 160px;
             overflow-y: auto;
             background: #222;
             border: 1px solid #555;
-            border-radius: 4px;
-            scrollbar-width: thin; /* Firefox */
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            display: none; /* Hidden by default */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+            scrollbar-width: thin;
+        }
+
+        /* Show the pop-up list when hovering over the container */
+        .time-dropdown-container:hover .time-list {
+            display: block;
         }
         
-        /* Custom Scrollbar for webkit (Chrome, Safari, Edge) */
+        /* Custom Scrollbar */
         .time-list::-webkit-scrollbar {
             width: 6px;
         }
@@ -129,6 +170,11 @@
             color: #aaa;
             transition: background 0.2s, color 0.2s;
             user-select: none;
+            border-bottom: 1px solid #333;
+        }
+
+        .time-item:last-child {
+            border-bottom: none;
         }
 
         .time-item:hover {
@@ -160,24 +206,40 @@
 
             <div class="panel-section">
                 <h3>2. Time Selection</h3>
-                <!-- Custom Rolling Selectors -->
                 <div class="custom-time-selector">
-                    <div class="time-row">
+                    
+                    <div class="time-row" id="row-year">
                         <div class="time-label">Year:</div>
-                        <div class="time-list" id="list-year"></div>
+                        <div class="time-dropdown-container">
+                            <div class="time-selected" id="display-year">2026</div>
+                            <div class="time-list" id="list-year"></div>
+                        </div>
                     </div>
-                    <div class="time-row">
+                    
+                    <div class="time-row" id="row-month">
                         <div class="time-label">Month:</div>
-                        <div class="time-list" id="list-month"></div>
+                        <div class="time-dropdown-container">
+                            <div class="time-selected" id="display-month">Jan</div>
+                            <div class="time-list" id="list-month"></div>
+                        </div>
                     </div>
-                    <div class="time-row">
+                    
+                    <div class="time-row" id="row-day">
                         <div class="time-label">Day:</div>
-                        <div class="time-list" id="list-day"></div>
+                        <div class="time-dropdown-container">
+                            <div class="time-selected" id="display-day">01</div>
+                            <div class="time-list" id="list-day"></div>
+                        </div>
                     </div>
-                    <div class="time-row">
+                    
+                    <div class="time-row" id="row-time">
                         <div class="time-label">Time (UTC/MYT):</div>
-                        <div class="time-list" id="list-time"></div>
+                        <div class="time-dropdown-container">
+                            <div class="time-selected" id="display-time">00:00/08:00</div>
+                            <div class="time-list" id="list-time"></div>
+                        </div>
                     </div>
+
                 </div>
             </div>
 
@@ -258,38 +320,53 @@
             { val: '18', label: '18:00/02:00' }
         ];
 
-        // Generic function to render a rolling list
-        function renderList(containerId, items, selectedValue, onSelect) {
+        // Generic function to render a list and update the display box
+        function renderList(containerId, displayId, items, selectedValue, onSelect) {
             const container = document.getElementById(containerId);
+            const display = document.getElementById(displayId);
             container.innerHTML = '';
             
+            let selectedLabel = '';
+
             items.forEach(item => {
+                if (item.value === selectedValue) {
+                    selectedLabel = item.label;
+                }
+                
                 let div = document.createElement('div');
                 div.className = 'time-item' + (item.value === selectedValue ? ' active' : '');
                 div.innerText = item.label;
                 div.dataset.value = item.value;
                 
                 div.onclick = function() {
-                    onSelect(item.value);
+                    // Temporarily hide the dropdown on click for better UX
+                    container.style.display = 'none';
+                    setTimeout(() => container.style.display = '', 100); 
+
+                    onSelect(item.value, item.label);
                 };
                 container.appendChild(div);
             });
 
-            // Scroll the active item into view on initial load
-            const activeItem = container.querySelector('.active');
-            if (activeItem) {
-                activeItem.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            // Update the text in the main blue display box
+            if (selectedLabel) {
+                display.innerText = selectedLabel;
             }
         }
 
-        // Fast update for active class (keeps scroll position)
-        function updateActiveClasses(containerId, selectedValue) {
+        // Fast update for active class and display box without re-rendering everything
+        function updateActiveSelection(containerId, displayId, selectedValue, selectedLabel) {
             const container = document.getElementById(containerId);
+            const display = document.getElementById(displayId);
             const items = container.getElementsByClassName('time-item');
             
+            display.innerText = selectedLabel;
+
             for (let item of items) {
                 if (item.dataset.value === selectedValue) {
                     item.classList.add('active');
+                    // Scroll the newly active item into view
+                    item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                 } else {
                     item.classList.remove('active');
                 }
@@ -298,12 +375,8 @@
 
         // Updates maximum allowable days depending on leap years and chosen month
         function updateDaysList() {
-            // "Date(year, month, 0)" gets the last day of the previous month.
-            // Since our state.month is '01' to '12', passing it directly calculates accurately 
-            // the max days for the currently selected month.
             let maxDays = new Date(parseInt(timeState.year), parseInt(timeState.month), 0).getDate();
             
-            // Cap the selected day if it exceeds the new month's limit
             if (parseInt(timeState.day) > maxDays) {
                 timeState.day = maxDays.toString().padStart(2, '0');
             }
@@ -314,10 +387,9 @@
                 days.push({ label: val, value: val });
             }
             
-            // Re-render entirely because the list length might change
-            renderList('list-day', days, timeState.day, (val) => {
+            renderList('list-day', 'display-day', days, timeState.day, (val, label) => {
                 timeState.day = val;
-                updateActiveClasses('list-day', timeState.day);
+                updateActiveSelection('list-day', 'display-day', timeState.day, label);
                 triggerMapUpdate();
             });
         }
@@ -336,23 +408,23 @@
 
             let times = timeOptions.map(t => ({ label: t.label, value: t.val }));
 
-            renderList('list-year', years, timeState.year, (val) => {
+            renderList('list-year', 'display-year', years, timeState.year, (val, label) => {
                 timeState.year = val;
-                updateActiveClasses('list-year', timeState.year);
-                updateDaysList(); // Month logic depends on Year (leap years)
+                updateActiveSelection('list-year', 'display-year', timeState.year, label);
+                updateDaysList();
                 triggerMapUpdate();
             });
 
-            renderList('list-month', months, timeState.month, (val) => {
+            renderList('list-month', 'display-month', months, timeState.month, (val, label) => {
                 timeState.month = val;
-                updateActiveClasses('list-month', timeState.month);
-                updateDaysList(); // Days depend on Month
+                updateActiveSelection('list-month', 'display-month', timeState.month, label);
+                updateDaysList(); 
                 triggerMapUpdate();
             });
 
-            renderList('list-time', times, timeState.time, (val) => {
+            renderList('list-time', 'display-time', times, timeState.time, (val, label) => {
                 timeState.time = val;
-                updateActiveClasses('list-time', timeState.time);
+                updateActiveSelection('list-time', 'display-time', timeState.time, label);
                 triggerMapUpdate();
             });
 
@@ -370,7 +442,6 @@
 
         // --- Map Update Functions ---
 
-        // Function to load Image Overlay
         function updateStaticLayer() {
             var selectedParam = $('input[name="parameter"]:checked').val();
             var y = timeState.year;
@@ -384,15 +455,12 @@
             }
 
             if (selectedParam !== 'none') {
-                // Adjust this URL structure to match your actual local data files
-                // Example: data/temp_20260722_00.png
                 var imageUrl = `data/${selectedParam}_${y}${m}${d}_${t}.png`;
                 currentImageLayer = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.65 });
                 currentImageLayer.addTo(map);
             }
         }
 
-        // Function to load Wind JSON
         function updateWindLayer() {
             if (windVelocityLayer) {
                 map.removeLayer(windVelocityLayer);
@@ -405,8 +473,6 @@
                 var d = timeState.day;
                 var t = timeState.time;
                 
-                // Adjust this URL structure to match your wind JSON file names
-                // Example: data/wind_20260722_00.json
                 var jsonUrl = `data/wind_${y}${m}${d}_${t}.json`;
 
                 $.getJSON(jsonUrl, function (data) {
