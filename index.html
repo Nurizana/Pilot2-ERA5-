@@ -122,7 +122,7 @@
                     <select id="sel-month" title="Month"></select>
                     <select id="sel-day" title="Day"></select>
                     <select id="sel-time" class="full-width" title="Time (UTC/MYT)">
-                        <option value="00">00:00 UTC / 08:00 MYT</option>
+                        <option value="00">Time 00:00 UTC / 08:00 MYT</option>
                         <option value="06">06:00 UTC / 14:00 MYT</option>
                         <option value="12">12:00 UTC / 20:00 MYT</option>
                         <option value="18">18:00 UTC / 02:00 MYT</option>
@@ -136,6 +136,7 @@
                 <label><input type="radio" name="parameter" value="temp"> Temperature</label>
                 <label><input type="radio" name="parameter" value="geo"> Geopotential</label>
                 <label><input type="radio" name="parameter" value="rain"> Specific Rain Water Content</label>
+                <label><input type="radio" name="parameter" value="wind"> Wind Layer</label>
             </div>
 
             <div class="panel-section">
@@ -191,22 +192,30 @@
         var imageBounds = [[90, 0], [-90, 360]]; // Global bounds for ERA5
 
         // --- Populate Time Dropdowns dynamically ---
+        
+        // Year Selection (Descending Order)
         var yearSelect = document.getElementById('sel-year');
-        for (let i = 2020; i <= 2026; i++) {
-            yearSelect.add(new Option("Year " + i, i));
+        for (let i = 2026; i >= 2020; i--) {
+            let optionText = (i === 2026) ? "Year " + i : i.toString();
+            yearSelect.add(new Option(optionText, i));
         }
         yearSelect.value = "2026"; // Set default year
 
+        // Month Selection (Abbreviated Names)
         var monthSelect = document.getElementById('sel-month');
-        for (let i = 1; i <= 12; i++) {
-            let mStr = (i < 10 ? '0' : '') + i;
-            monthSelect.add(new Option("Month " + mStr, mStr));
+        var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        for (let i = 0; i < 12; i++) {
+            let mStr = (i + 1 < 10 ? '0' : '') + (i + 1); // Keep value as '01', '02', etc.
+            let optionText = (i === 0) ? "Month " + monthNames[i] : monthNames[i];
+            monthSelect.add(new Option(optionText, mStr));
         }
 
+        // Day Selection
         var daySelect = document.getElementById('sel-day');
         for (let i = 1; i <= 31; i++) {
             let dayStr = (i < 10 ? '0' : '') + i;
-            daySelect.add(new Option("Day " + dayStr, dayStr));
+            let optionText = (i === 1) ? "Day " + dayStr : dayStr;
+            daySelect.add(new Option(optionText, dayStr));
         }
 
         // Function to load Image Overlay
