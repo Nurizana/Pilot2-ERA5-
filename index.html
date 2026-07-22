@@ -454,10 +454,18 @@
                 currentImageLayer = null;
             }
 
-            if (selectedParam !== 'none') {
+            // FIX: Only attempt to load a PNG if the parameter is temp, geo, or rain.
+            if (selectedParam === 'temp' || selectedParam === 'geo' || selectedParam === 'rain') {
                 var imageUrl = `data/${selectedParam}_${y}${m}${d}_${t}.png`;
                 currentImageLayer = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.65 });
                 currentImageLayer.addTo(map);
+            }
+            
+            // FIX: If the user selects the "Wind Layer" radio button, automatically
+            // check the animated wind overlay box and draw the JSON wind particles.
+            if (selectedParam === 'wind') {
+                $('#toggle-wind-anim').prop('checked', true);
+                updateWindLayer();
             }
         }
 
