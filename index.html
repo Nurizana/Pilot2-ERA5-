@@ -15,14 +15,40 @@
     <style>
         body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; overflow: hidden; }
         #map { width: 100%; height: 100%; background: #111; }
+        
+        /* The trigger ribbon with vertical text */
+        #hover-trigger { 
+            position: absolute; 
+            top: 20px; 
+            right: 0; 
+            width: 40px; 
+            height: 90%; 
+            z-index: 998; 
+            background: rgba(30, 30, 30, 0.9);
+            border-radius: 10px 0 0 10px;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            letter-spacing: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: -2px 0 10px rgba(0,0,0,0.5);
+        }
+
+        /* The main control panel */
         #control-panel {
             position: absolute; top: 20px; right: -300px; width: 280px; height: 90%;
-            background: rgba(30, 30, 30, 0.9); color: #fff; z-index: 1000;
+            background: rgba(30, 30, 30, 0.95); color: #fff; z-index: 1000;
             transition: right 0.4s ease-in-out; padding: 20px; border-radius: 10px 0 0 10px;
             box-shadow: -2px 0 10px rgba(0,0,0,0.5); overflow-y: auto;
         }
-        #hover-trigger { position: absolute; top: 0; right: 0; width: 50px; height: 100%; z-index: 999; }
+
+        /* Hover interactions to slide out the panel */
         #hover-trigger:hover + #control-panel, #control-panel:hover { right: 0; }
+
         .panel-section { margin-bottom: 25px; border-bottom: 1px solid #444; padding-bottom: 15px; }
         .panel-section:last-child { border-bottom: none; }
         .panel-section h3 { margin-top: 0; font-size: 16px; color: #4da6ff; }
@@ -32,13 +58,16 @@
 </head>
 <body>
     <div id="map"></div>
-    <div id="hover-trigger"></div>
+    
+    <!-- Added OPTIONS text to the hover trigger -->
+    <div id="hover-trigger">OPTIONS</div>
 
     <div id="control-panel">
         <div class="panel-section">
             <h3>1. Base Map</h3>
-            <label><input type="radio" name="basemap" value="dark" checked> Night Vision (with labels)</label>
-            <label><input type="radio" name="basemap" value="ocean"> Blue Oceans (with labels)</label>
+            <!-- Updated Labels -->
+            <label><input type="radio" name="basemap" value="dark" checked> Dark Base Map</label>
+            <label><input type="radio" name="basemap" value="ocean"> Oceans Base Map</label>
         </div>
 
         <div class="panel-section">
@@ -67,8 +96,18 @@
         var map = L.map('map', { zoomControl: false }).setView([20, 0], 3);
         L.control.zoom({ position: 'topleft' }).addTo(map);
         
-        var darkMap = L.tileLayer('https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png').addTo(map);
-        var oceanMap = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}');
+        // --- ESRI DARK BASE MAP (Base + Labels combined) ---
+        var darkBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}');
+        var darkLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}');
+        var darkMap = L.layerGroup([darkBase, darkLabels]);
+
+        // --- ESRI OCEAN BASE MAP (Base + Labels combined) ---
+        var oceanBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}');
+        var oceanLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}');
+        var oceanMap = L.layerGroup([oceanBase, oceanLabels]);
+
+        // Add Default Base Map
+        darkMap.addTo(map);
 
         // Layer Variables
         var currentImageLayer = null;
@@ -127,8 +166,13 @@
 
         // Event Listeners
         $('input[name="basemap"]').change(function() {
-            if ($(this).val() === 'dark') { map.removeLayer(oceanMap); darkMap.addTo(map); } 
-            else { map.removeLayer(darkMap); oceanMap.addTo(map); }
+            if ($(this).val() === 'dark') { 
+                map.removeLayer(oceanMap); 
+                darkMap.addTo(map); 
+            } else { 
+                map.removeLayer(darkMap); 
+                oceanMap.addTo(map); 
+            }
         });
 
         $('input[name="parameter"]').change(updateStaticLayer);
