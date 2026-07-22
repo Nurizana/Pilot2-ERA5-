@@ -27,12 +27,11 @@
             position: absolute; 
             top: 20px; 
             right: 0; 
-            width: 280px; 
+            width: 290px; 
             height: calc(100% - 40px);
             background: rgba(30, 30, 30, 0.95); 
             color: #fff; 
             z-index: 1000;
-            /* Use GPU-accelerated transform for smooth mobile rendering */
             transform: translateX(100%);
             transition: transform 0.4s ease-in-out; 
             border-radius: 10px 0 0 10px;
@@ -47,7 +46,7 @@
         /* The trigger ribbon attached to the left side of the panel */
         #toggle-trigger { 
             position: absolute; 
-            left: -50px; /* Sticks out to the left of the hidden panel */
+            left: -50px;
             top: 0; 
             width: 50px; 
             height: 100%; 
@@ -58,13 +57,12 @@
             align-items: center;
             justify-content: center;
             writing-mode: vertical-rl;
-            text-orientation: upright; /* Stacks the letters upright */
+            text-orientation: upright;
             letter-spacing: 8px;
             font-weight: bold;
             font-size: 16px;
             cursor: pointer;
             box-shadow: -2px 0 10px rgba(0,0,0,0.5);
-            /* Prevents text highlighting when tapped on mobile */
             user-select: none;
             -webkit-user-select: none;
         }
@@ -81,7 +79,25 @@
         .panel-section:last-child { border-bottom: none; }
         .panel-section h3 { margin-top: 0; font-size: 16px; color: #4da6ff; }
         label { display: block; margin-bottom: 12px; cursor: pointer; font-size: 14px; }
-        select { width: 100%; padding: 10px; margin-bottom: 10px; background: #333; color: white; border: 1px solid #555; border-radius: 4px; font-size: 14px; }
+        
+        /* Time Selection Grid */
+        .time-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .time-grid select {
+            flex: 1 1 40%;
+            padding: 8px;
+            background: #333;
+            color: white;
+            border: 1px solid #555;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .time-grid select.full-width {
+            flex: 1 1 100%;
+        }
     </style>
 </head>
 <body>
@@ -100,18 +116,26 @@
             </div>
 
             <div class="panel-section">
-                <h3>2. Weather Parameter</h3>
+                <h3>2. Time Selection</h3>
+                <div class="time-grid">
+                    <select id="sel-year" title="Year"></select>
+                    <select id="sel-month" title="Month"></select>
+                    <select id="sel-day" title="Day"></select>
+                    <select id="sel-time" class="full-width" title="Time (UTC/MYT)">
+                        <option value="00">00:00 UTC / 08:00 MYT</option>
+                        <option value="06">06:00 UTC / 14:00 MYT</option>
+                        <option value="12">12:00 UTC / 20:00 MYT</option>
+                        <option value="18">18:00 UTC / 02:00 MYT</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <h3>3. Weather Parameter</h3>
                 <label><input type="radio" name="parameter" value="none" checked> None (Base Map Only)</label>
                 <label><input type="radio" name="parameter" value="temp"> Temperature</label>
                 <label><input type="radio" name="parameter" value="geo"> Geopotential</label>
                 <label><input type="radio" name="parameter" value="rain"> Specific Rain Water Content</label>
-            </div>
-
-            <div class="panel-section">
-                <h3>3. Time Selection (00:00 UTC)</h3>
-                <select id="sel-day">
-                    <!-- JavaScript will populate days 01 to 31 dynamically -->
-                </select>
             </div>
 
             <div class="panel-section">
@@ -132,8 +156,8 @@
             e.stopPropagation(); // Prevent map click event from firing immediately
         });
 
-        // 1. Initialize Map
-        var map = L.map('map', { zoomControl: false }).setView([20, 0], 3);
+        // 1. Initialize Map - Centered on ASEAN Countries
+        var map = L.map('map', { zoomControl: false }).setView([5.0, 114.0], 5);
         L.control.zoom({ position: 'topleft' }).addTo(map);
 
         // Close panel when tapping/clicking anywhere on the map (Mobile friendly UX)
@@ -166,20 +190,32 @@
         var windVelocityLayer = null;
         var imageBounds = [[90, 0], [-90, 360]]; // Global bounds for ERA5
 
-        // Populate Day Dropdown (01 to 31)
+        // --- Populate Time Dropdowns dynamically ---
+        var yearSelect = document.getElementById('sel-year');
+        for (let i = 2020; i <= 2026; i++) {
+            yearSelect.add(new Option("Year " + i, i));
+        }
+        yearSelect.value = "2026"; // Set default year
+
+        var monthSelect = document.getElementById('sel-month');
+        for (let i = 1; i <= 12; i++) {
+            let mStr = (i < 10 ? '0' : '') + i;
+            monthSelect.add(new Option("Month " + mStr, mStr));
+        }
+
         var daySelect = document.getElementById('sel-day');
         for (let i = 1; i <= 31; i++) {
             let dayStr = (i < 10 ? '0' : '') + i;
-            let option = document.createElement('option');
-            option.value = dayStr;
-            option.text = "Day " + dayStr;
-            daySelect.appendChild(option);
+            daySelect.add(new Option("Day " + dayStr, dayStr));
         }
 
-        // Function to load Image Overlay (Temp, Geo, Rain)
+        // Function to load Image Overlay
         function updateStaticLayer() {
             var selectedParam = $('input[name="parameter"]:checked').val();
-            var selectedDay = $('#sel-day').val();
+            var y = $('#sel-year').val();
+            var m = $('#sel-month').val();
+            var d = $('#sel-day').val();
+            var t = $('#sel-time').val();
 
             if (currentImageLayer) {
                 map.removeLayer(currentImageLayer);
@@ -187,7 +223,9 @@
             }
 
             if (selectedParam !== 'none') {
-                var imageUrl = `data/${selectedParam}_${selectedDay}.png`;
+                // Adjust this URL structure to match your actual local data files
+                // Example: data/temp_20260722_00.png
+                var imageUrl = `data/${selectedParam}_${y}${m}${d}_${t}.png`;
                 currentImageLayer = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.65 });
                 currentImageLayer.addTo(map);
             }
@@ -201,8 +239,16 @@
             }
 
             if ($('#toggle-wind-anim').is(':checked')) {
-                var selectedDay = $('#sel-day').val();
-                $.getJSON(`data/wind_${selectedDay}.json`, function (data) {
+                var y = $('#sel-year').val();
+                var m = $('#sel-month').val();
+                var d = $('#sel-day').val();
+                var t = $('#sel-time').val();
+                
+                // Adjust this URL structure to match your wind JSON file names
+                // Example: data/wind_20260722_00.json
+                var jsonUrl = `data/wind_${y}${m}${d}_${t}.json`;
+
+                $.getJSON(jsonUrl, function (data) {
                     windVelocityLayer = L.velocityLayer({
                         displayValues: true,
                         displayOptions: { velocityType: 'Wind', position: 'bottomleft' },
@@ -211,12 +257,12 @@
                     });
                     windVelocityLayer.addTo(map);
                 }).fail(function() {
-                    console.error("Wind data for day " + selectedDay + " not generated yet.");
+                    console.error("Wind data for " + y + "-" + m + "-" + d + " at " + t + " UTC not generated yet.");
                 });
             }
         }
 
-        // Event Listeners
+        // Event Listeners for UI Changes
         $('input[name="basemap"]').change(function() {
             if ($(this).val() === 'dark') { 
                 map.removeLayer(oceanMap); 
@@ -228,7 +274,7 @@
         });
 
         $('input[name="parameter"]').change(updateStaticLayer);
-        $('#sel-day').change(function() {
+        $('#sel-year, #sel-month, #sel-day, #sel-time').change(function() {
             updateStaticLayer();
             updateWindLayer();
         });
