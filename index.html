@@ -27,7 +27,7 @@
             position: absolute; 
             top: 20px; 
             right: 0; 
-            width: 290px; 
+            width: 320px; /* Slightly wider to accommodate custom rolling lists */
             height: calc(100% - 40px);
             background: rgba(30, 30, 30, 0.95); 
             color: #fff; 
@@ -80,23 +80,66 @@
         .panel-section h3 { margin-top: 0; font-size: 16px; color: #4da6ff; }
         label { display: block; margin-bottom: 12px; cursor: pointer; font-size: 14px; }
         
-        /* Time Selection Grid */
-        .time-grid {
+        /* Custom Rolling Time Selection Grid */
+        .custom-time-selector {
             display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
+            flex-direction: column;
+            gap: 15px;
         }
-        .time-grid select {
-            flex: 1 1 40%;
-            padding: 8px;
-            background: #333;
-            color: white;
+        
+        .time-row {
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .time-label {
+            width: 130px;
+            font-size: 14px;
+            padding-top: 8px;
+            color: #ddd;
+        }
+
+        .time-list {
+            flex: 1;
+            height: 110px; /* Gives the rolling capability visual */
+            overflow-y: auto;
+            background: #222;
             border: 1px solid #555;
             border-radius: 4px;
-            font-size: 14px;
+            scrollbar-width: thin; /* Firefox */
         }
-        .time-grid select.full-width {
-            flex: 1 1 100%;
+        
+        /* Custom Scrollbar for webkit (Chrome, Safari, Edge) */
+        .time-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .time-list::-webkit-scrollbar-thumb {
+            background: #666;
+            border-radius: 3px;
+        }
+        .time-list::-webkit-scrollbar-track {
+            background: #222;
+        }
+
+        .time-item {
+            padding: 8px;
+            font-size: 14px;
+            text-align: center;
+            cursor: pointer;
+            color: #aaa;
+            transition: background 0.2s, color 0.2s;
+            user-select: none;
+        }
+
+        .time-item:hover {
+            background: #333;
+            color: #fff;
+        }
+
+        .time-item.active {
+            background: #4da6ff;
+            color: #000;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -117,16 +160,24 @@
 
             <div class="panel-section">
                 <h3>2. Time Selection</h3>
-                <div class="time-grid">
-                    <select id="sel-year" title="Year"></select>
-                    <select id="sel-month" title="Month"></select>
-                    <select id="sel-day" title="Day"></select>
-                    <select id="sel-time" class="full-width" title="Time (UTC/MYT)">
-                        <option value="00">Time 00:00 UTC / 08:00 MYT</option>
-                        <option value="06">06:00 UTC / 14:00 MYT</option>
-                        <option value="12">12:00 UTC / 20:00 MYT</option>
-                        <option value="18">18:00 UTC / 02:00 MYT</option>
-                    </select>
+                <!-- Custom Rolling Selectors -->
+                <div class="custom-time-selector">
+                    <div class="time-row">
+                        <div class="time-label">Year:</div>
+                        <div class="time-list" id="list-year"></div>
+                    </div>
+                    <div class="time-row">
+                        <div class="time-label">Month:</div>
+                        <div class="time-list" id="list-month"></div>
+                    </div>
+                    <div class="time-row">
+                        <div class="time-label">Day:</div>
+                        <div class="time-list" id="list-day"></div>
+                    </div>
+                    <div class="time-row">
+                        <div class="time-label">Time (UTC/MYT):</div>
+                        <div class="time-list" id="list-time"></div>
+                    </div>
                 </div>
             </div>
 
@@ -191,40 +242,141 @@
         var windVelocityLayer = null;
         var imageBounds = [[90, 0], [-90, 360]]; // Global bounds for ERA5
 
-        // --- Populate Time Dropdowns dynamically ---
-        
-        // Year Selection (Descending Order)
-        var yearSelect = document.getElementById('sel-year');
-        for (let i = 2026; i >= 2020; i--) {
-            let optionText = (i === 2026) ? "Year " + i : i.toString();
-            yearSelect.add(new Option(optionText, i));
-        }
-        yearSelect.value = "2026"; // Set default year
+        // --- Custom Time Selection State & Logic ---
+        let timeState = {
+            year: '2026',
+            month: '01',
+            day: '01',
+            time: '00'
+        };
 
-        // Month Selection (Abbreviated Names)
-        var monthSelect = document.getElementById('sel-month');
-        var monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        for (let i = 0; i < 12; i++) {
-            let mStr = (i + 1 < 10 ? '0' : '') + (i + 1); // Keep value as '01', '02', etc.
-            let optionText = (i === 0) ? "Month " + monthNames[i] : monthNames[i];
-            monthSelect.add(new Option(optionText, mStr));
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        const timeOptions = [
+            { val: '00', label: '00:00/08:00' },
+            { val: '06', label: '06:00/14:00' },
+            { val: '12', label: '12:00/20:00' },
+            { val: '18', label: '18:00/02:00' }
+        ];
+
+        // Generic function to render a rolling list
+        function renderList(containerId, items, selectedValue, onSelect) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            items.forEach(item => {
+                let div = document.createElement('div');
+                div.className = 'time-item' + (item.value === selectedValue ? ' active' : '');
+                div.innerText = item.label;
+                div.dataset.value = item.value;
+                
+                div.onclick = function() {
+                    onSelect(item.value);
+                };
+                container.appendChild(div);
+            });
+
+            // Scroll the active item into view on initial load
+            const activeItem = container.querySelector('.active');
+            if (activeItem) {
+                activeItem.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
         }
 
-        // Day Selection
-        var daySelect = document.getElementById('sel-day');
-        for (let i = 1; i <= 31; i++) {
-            let dayStr = (i < 10 ? '0' : '') + i;
-            let optionText = (i === 1) ? "Day " + dayStr : dayStr;
-            daySelect.add(new Option(optionText, dayStr));
+        // Fast update for active class (keeps scroll position)
+        function updateActiveClasses(containerId, selectedValue) {
+            const container = document.getElementById(containerId);
+            const items = container.getElementsByClassName('time-item');
+            
+            for (let item of items) {
+                if (item.dataset.value === selectedValue) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            }
         }
+
+        // Updates maximum allowable days depending on leap years and chosen month
+        function updateDaysList() {
+            // "Date(year, month, 0)" gets the last day of the previous month.
+            // Since our state.month is '01' to '12', passing it directly calculates accurately 
+            // the max days for the currently selected month.
+            let maxDays = new Date(parseInt(timeState.year), parseInt(timeState.month), 0).getDate();
+            
+            // Cap the selected day if it exceeds the new month's limit
+            if (parseInt(timeState.day) > maxDays) {
+                timeState.day = maxDays.toString().padStart(2, '0');
+            }
+            
+            let days = [];
+            for (let i = 1; i <= maxDays; i++) {
+                let val = i.toString().padStart(2, '0');
+                days.push({ label: val, value: val });
+            }
+            
+            // Re-render entirely because the list length might change
+            renderList('list-day', days, timeState.day, (val) => {
+                timeState.day = val;
+                updateActiveClasses('list-day', timeState.day);
+                triggerMapUpdate();
+            });
+        }
+
+        // Initialize all the lists
+        function initTimeSelectors() {
+            let years = [];
+            for (let i = 2026; i >= 2020; i--) {
+                years.push({ label: i.toString(), value: i.toString() });
+            }
+            
+            let months = monthNames.map((m, i) => {
+                let val = (i + 1).toString().padStart(2, '0');
+                return { label: m, value: val };
+            });
+
+            let times = timeOptions.map(t => ({ label: t.label, value: t.val }));
+
+            renderList('list-year', years, timeState.year, (val) => {
+                timeState.year = val;
+                updateActiveClasses('list-year', timeState.year);
+                updateDaysList(); // Month logic depends on Year (leap years)
+                triggerMapUpdate();
+            });
+
+            renderList('list-month', months, timeState.month, (val) => {
+                timeState.month = val;
+                updateActiveClasses('list-month', timeState.month);
+                updateDaysList(); // Days depend on Month
+                triggerMapUpdate();
+            });
+
+            renderList('list-time', times, timeState.time, (val) => {
+                timeState.time = val;
+                updateActiveClasses('list-time', timeState.time);
+                triggerMapUpdate();
+            });
+
+            updateDaysList(); 
+        }
+
+        // Start initialization
+        initTimeSelectors();
+
+        // Single execution pathway to trigger map data reload
+        function triggerMapUpdate() {
+            updateStaticLayer();
+            updateWindLayer();
+        }
+
+        // --- Map Update Functions ---
 
         // Function to load Image Overlay
         function updateStaticLayer() {
             var selectedParam = $('input[name="parameter"]:checked').val();
-            var y = $('#sel-year').val();
-            var m = $('#sel-month').val();
-            var d = $('#sel-day').val();
-            var t = $('#sel-time').val();
+            var y = timeState.year;
+            var m = timeState.month;
+            var d = timeState.day;
+            var t = timeState.time;
 
             if (currentImageLayer) {
                 map.removeLayer(currentImageLayer);
@@ -248,10 +400,10 @@
             }
 
             if ($('#toggle-wind-anim').is(':checked')) {
-                var y = $('#sel-year').val();
-                var m = $('#sel-month').val();
-                var d = $('#sel-day').val();
-                var t = $('#sel-time').val();
+                var y = timeState.year;
+                var m = timeState.month;
+                var d = timeState.day;
+                var t = timeState.time;
                 
                 // Adjust this URL structure to match your wind JSON file names
                 // Example: data/wind_20260722_00.json
@@ -271,7 +423,7 @@
             }
         }
 
-        // Event Listeners for UI Changes
+        // --- Event Listeners for Base Map & Parameter Changes ---
         $('input[name="basemap"]').change(function() {
             if ($(this).val() === 'dark') { 
                 map.removeLayer(oceanMap); 
@@ -283,10 +435,6 @@
         });
 
         $('input[name="parameter"]').change(updateStaticLayer);
-        $('#sel-year, #sel-month, #sel-day, #sel-time').change(function() {
-            updateStaticLayer();
-            updateWindLayer();
-        });
         $('#toggle-wind-anim').change(updateWindLayer);
 
     </script>
