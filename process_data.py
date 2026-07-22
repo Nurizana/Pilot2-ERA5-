@@ -1,5 +1,6 @@
 import cdsapi
 import xarray as xr
+import pandas as pd
 import json
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,8 +14,7 @@ os.makedirs("data", exist_ok=True)
 print("Calculating target date for ERA5 dataset...")
 now = datetime.utcnow()
 
-# FIX: Find the previous month directly instead of subtracting 35 days.
-# By going to the 1st of the current month and subtracting 1 day, we safely land on the previous month.
+# Target the previous month safely
 target_date = now.replace(day=1) - timedelta(days=1)
 target_year = target_date.strftime("%Y")
 target_month = target_date.strftime("%m")
@@ -38,7 +38,7 @@ request = {
     "year": [target_year],
     "month": [target_month], 
     "day": days_list,
-    "time": ["00:00"], # Maintained optimization: Only downloading 00:00
+    "time": ["00:00"], 
     "pressure_level": ["850"],
     "data_format": "netcdf",
     "download_format": "unarchived"
@@ -58,27 +58,26 @@ time_coord = 'valid_time' if 'valid_time' in ds.coords else 'time'
 
 # Loop through every day (timestep) in the downloaded file
 for i in range(len(ds[time_coord])):
-    # FIX: Robustly extract datetime integers to guarantee exact YYYYMMDD_HH formatting
-    year_val = int(ds[time_coord][i].dt.year)
-    month_val = int(ds[time_coord][i].dt.month)
-    day_val = int(ds[time_coord][i].dt.day)
-    hour_val = int(ds[time_coord][i].dt.hour)
-    
-    # Format components with leading zeros (e.g., 20260603_00)
-    file_suffix = f"{year_val}{month_val:02d}{day_val:02d}_{hour_val:02d}"
+    timestamp = pd.to_datetime(ds[time_coord][i].values)
+    file_suffix = f"{timestamp.year}{timestamp.month:02d}{timestamp.day:02d}_{timestamp.hour:02d}"
     print(f"Processing timestamp: {file_suffix}...")
 
-    # --- 1. WIND (JSON) ---
-    u_wind = np.nan_to_num(ds['u'].values[i, 0, :, :], nan=0.0)
-    v_wind = np.nan_to_num(ds['v'].values[i, 0, :, :], nan=0.0)
+    # --- WIND DATA EXTRACTION ---
+    u_wind = np.nan_to_num(ds['u'].isel({time_coord: i}).squeeze().values, nan=0.0)
+    v_wind = np.nan_to_num(ds['v'].isel({time_coord: i}).squeeze().values, nan=0.0)
+    
+    # Calculate static wind speed (magnitude) for the PNG image layer
+    wind_speed = np.sqrt(u_wind**2 + v_wind**2)
     
     header = {
-        "lo1": float(ds.longitude.min()), "la1": float(ds.latitude.max()),
-        "dx": float(abs(ds.longitude[1] - ds.longitude[0])),
-        "dy": float(abs(ds.latitude[0] - ds.latitude[1])),
+        "lo1": float(ds.longitude.min().values), "la1": float(ds.latitude.max().values),
+        "dx": float(abs(ds.longitude[1].values - ds.longitude[0].values)),
+        "dy": float(abs(ds.latitude[0].values - ds.latitude[1].values)),
         "nx": int(len(ds.longitude)), "ny": int(len(ds.latitude)),
-        "refTime": str(ds[time_coord][i].values)
+        "refTime": str(timestamp)
     }
+    
+    # 1. Save JSON for the Animated Wind Overlay (Section 4)
     output_json = [
         {"header": {**header, "parameterCategory": 2, "parameterNumber": 2}, "data": u_wind.flatten().tolist()},
         {"header": {**header, "parameterCategory": 2, "parameterNumber": 3}, "data": v_wind.flatten().tolist()}
@@ -86,16 +85,21 @@ for i in range(len(ds[time_coord])):
     with open(f"data/wind_{file_suffix}.json", "w") as f:
         json.dump(output_json, f)
 
-    # --- 2. TEMPERATURE (PNG) ---
-    temp_data = ds['t'].values[i, 0, :, :]
+    # --- STATIC IMAGE EXPORTS (Section 3) ---
+    
+    # 2. Save Static Wind Speed PNG
+    plt.imsave(f'data/wind_{file_suffix}.png', wind_speed, cmap='YlGnBu')
+
+    # Save Temperature PNG
+    temp_data = ds['t'].isel({time_coord: i}).squeeze().values
     plt.imsave(f'data/temp_{file_suffix}.png', temp_data, cmap='coolwarm')
 
-    # --- 3. GEOPOTENTIAL (PNG) ---
-    geo_data = ds['z'].values[i, 0, :, :]
+    # Save Geopotential PNG
+    geo_data = ds['z'].isel({time_coord: i}).squeeze().values
     plt.imsave(f'data/geo_{file_suffix}.png', geo_data, cmap='viridis')
 
-    # --- 4. RAIN WATER CONTENT (PNG) ---
-    rain_data = ds['crwc'].values[i, 0, :, :]
+    # Save Rain PNG
+    rain_data = ds['crwc'].isel({time_coord: i}).squeeze().values
     plt.imsave(f'data/rain_{file_suffix}.png', rain_data, cmap='Blues')
 
 print("All daily processing complete! Files saved to /data folder.")
