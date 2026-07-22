@@ -34,7 +34,7 @@ request = {
     "year": [target_year],
     "month": [target_month], 
     "day": days_list,
-    "time": ["00:00"], # OPTIMIZED: Only download 00:00 to save processing time
+    "time": ["00:00"], # OPTIMIZED: Only downloading 00:00 to save processing time/memory
     "pressure_level": ["850"],
     "data_format": "netcdf",
     "download_format": "unarchived"
@@ -49,14 +49,20 @@ ds = xr.open_dataset(output_file)
 # Standardize longitudes to 0-360 for web mapping
 ds = ds.assign_coords(longitude=(ds.longitude % 360)).sortby('longitude')
 
-# --- THE FIX: Detect the correct time dimension name ---
-# (ERA5 NetCDF often uses 'valid_time' instead of 'time')
+# Detect the correct time dimension name
 time_coord = 'valid_time' if 'valid_time' in ds.coords else 'time'
 
 # Loop through every day (timestep) in the downloaded file using the correct time coordinate
 for i in range(len(ds[time_coord])):
-    day_str = str(ds[time_coord][i].dt.day.values).zfill(2)
-    print(f"Processing Day {day_str}...")
+    # --- THE FIX: Extract datetime to match the UI's expected YYYYMMDD_HH format ---
+    dt = ds[time_coord][i].dt
+    y_str = str(dt.year.values)
+    m_str = str(dt.month.values).zfill(2)
+    d_str = str(dt.day.values).zfill(2)
+    h_str = str(dt.hour.values).zfill(2)
+    
+    file_suffix = f"{y_str}{m_str}{d_str}_{h_str}"
+    print(f"Processing timestamp: {file_suffix}...")
 
     # --- 1. WIND (JSON) ---
     u_wind = np.nan_to_num(ds['u'].values[i, 0, :, :], nan=0.0)
@@ -73,19 +79,19 @@ for i in range(len(ds[time_coord])):
         {"header": {**header, "parameterCategory": 2, "parameterNumber": 2}, "data": u_wind.flatten().tolist()},
         {"header": {**header, "parameterCategory": 2, "parameterNumber": 3}, "data": v_wind.flatten().tolist()}
     ]
-    with open(f"data/wind_{day_str}.json", "w") as f:
+    with open(f"data/wind_{file_suffix}.json", "w") as f:
         json.dump(output_json, f)
 
     # --- 2. TEMPERATURE (PNG) ---
     temp_data = ds['t'].values[i, 0, :, :]
-    plt.imsave(f'data/temp_{day_str}.png', temp_data, cmap='coolwarm')
+    plt.imsave(f'data/temp_{file_suffix}.png', temp_data, cmap='coolwarm')
 
     # --- 3. GEOPOTENTIAL (PNG) ---
     geo_data = ds['z'].values[i, 0, :, :]
-    plt.imsave(f'data/geo_{day_str}.png', geo_data, cmap='viridis')
+    plt.imsave(f'data/geo_{file_suffix}.png', geo_data, cmap='viridis')
 
     # --- 4. RAIN WATER CONTENT (PNG) ---
     rain_data = ds['crwc'].values[i, 0, :, :]
-    plt.imsave(f'data/rain_{day_str}.png', rain_data, cmap='Blues')
+    plt.imsave(f'data/rain_{file_suffix}.png', rain_data, cmap='Blues')
 
 print("All daily processing complete! Files saved to /data folder.")
