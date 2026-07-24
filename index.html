@@ -64,19 +64,18 @@
         .time-item:hover { background: #333; color: #fff; }
         .time-item.active { background: #4da6ff; color: #000; font-weight: bold; }
 
-        #crutem5-legend-box {
-            display: none; margin-top: 10px; padding: 10px; background: rgba(20, 20, 20, 0.8);
-            border-radius: 4px; border: 1px solid #555; font-size: 12px; color: #ddd; line-height: 1.4;
-        }
-
         #dynamic-legend {
             position: absolute; bottom: 30px; left: 20px; background: rgba(20, 20, 20, 0.9);
             color: white; padding: 15px; border-radius: 8px; border: 1px solid #444; z-index: 1000;
-            display: none; width: 260px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); font-size: 13px;
+            display: none; width: 280px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); font-size: 13px;
         }
         .legend-title { font-weight: bold; font-size: 15px; color: #4da6ff; margin-bottom: 5px; }
         .legend-time { font-size: 12px; color: #bbb; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 8px; }
-        .legend-scale { width: 100%; height: 15px; border-radius: 3px; margin-bottom: 5px; }
+        
+        .legend-block { margin-bottom: 12px; }
+        .legend-block:last-child { margin-bottom: 0; }
+        .legend-block strong { display: block; font-size: 13px; margin-bottom: 4px; color: #eee; }
+        .legend-scale { width: 100%; height: 12px; border-radius: 3px; margin-bottom: 3px; }
         .legend-labels { display: flex; justify-content: space-between; font-size: 11px; color: #ddd; }
         
         .play-control { margin-top: 15px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #444; padding-top: 10px; }
@@ -89,9 +88,9 @@
     <div id="map"></div>
     
     <div id="dynamic-legend">
-        <div class="legend-title" id="leg-title">Parameter</div>
+        <div class="legend-title" id="leg-title">Active Layers</div>
         <div class="legend-time" id="leg-time">Date & Time</div>
-        <div id="leg-visual"></div>
+        <div id="leg-visual"></div> <!-- Stacked legends will be injected here -->
         <div class="play-control">
             <button id="play-btn">▶ Play Month</button>
             <span id="play-status" style="font-size: 11px; color:#aaa;"></span>
@@ -106,6 +105,7 @@
                 <label><input type="radio" name="basemap" value="dark" checked> Dark Base Map</label>
                 <label><input type="radio" name="basemap" value="ocean"> Oceans Base Map</label>
             </div>
+            
             <div class="panel-section">
                 <h3>2. Time Selection</h3>
                 <div class="custom-time-selector">
@@ -139,27 +139,20 @@
                     </div>
                 </div>
             </div>
+            
             <div class="panel-section">
-                <h3>3. Weather Parameter</h3>
-                <label><input type="radio" name="parameter" value="none" checked> None (Base Map Only)</label>
-                <label><input type="radio" name="parameter" value="temp"> Temperature</label>
-                <label><input type="radio" name="parameter" value="geo"> Geopotential Height</label>
-                <label><input type="radio" name="parameter" value="rain"> Specific Rain Water Content</label>
-                <label><input type="radio" name="parameter" value="wind"> Wind Vectors</label>
+                <h3>3. Base Weather Layer (Color Shade)</h3>
+                <label><input type="radio" name="base_weather" value="none" checked> None</label>
+                <label><input type="radio" name="base_weather" value="temp"> Temperature (850 hPa)</label>
+                <label><input type="radio" name="base_weather" value="rain"> Specific Rain Water Content</label>
             </div>
+            
             <div class="panel-section">
-                <h3>4. Wind Overlay</h3>
-                <label><input type="checkbox" id="toggle-wind-anim"> Animated Particles (850 hPa)</label>
-            </div>
-            <div class="panel-section">
-                <h3>5. Observation Data</h3>
+                <h3>4. Weather Overlays</h3>
+                <label><input type="checkbox" id="toggle-geo"> Geopotential Contours (850 hPa)</label>
+                <label><input type="checkbox" id="toggle-wind-vec"> Dynamic Wind Vectors</label>
+                <label><input type="checkbox" id="toggle-wind-anim"> Animated Wind Particles</label>
                 <label><input type="checkbox" id="toggle-crutem5"> CRUTEM5 Gridboxes</label>
-                <div id="crutem5-legend-box">
-                    <strong>CRUTEM5 Dataset</strong><br>
-                    <span style="color: #4da6ff;">■</span> Temperature Anomalies<br>
-                    <hr style="border: 0; border-top: 1px solid #444; margin: 8px 0;">
-                    <em>Click on any highlighted gridbox to view detailed observation metrics.</em>
-                </div>
             </div>
         </div>
     </div>
@@ -273,9 +266,13 @@
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}')
         ]);
 
-        var currentImageLayer = null, windVelocityLayer = null, customArrowLayer = null, crutem5KmlLayer = null; 
-        var imageBounds = [[90, 0], [-90, 360]]; 
+        var currentBaseImageLayer = null;
+        var currentGeoOverlayLayer = null;
+        var windVelocityLayer = null;
+        var customArrowLayer = null;
+        var crutem5KmlLayer = null; 
         
+        var imageBounds = [[90, 0], [-90, 360]]; 
         var currentJSONData = null;
         var currentJSONTime = null;
 
@@ -351,38 +348,75 @@
         initTimeSelectors();
 
         function updateLegend() {
-            var selectedParam = $('input[name="parameter"]:checked').val();
+            var baseWeather = $('input[name="base_weather"]:checked').val();
+            var showGeo = $('#toggle-geo').is(':checked');
+            var showWindVec = $('#toggle-wind-vec').is(':checked');
+            var showWindAnim = $('#toggle-wind-anim').is(':checked');
+            var showCrutem = $('#toggle-crutem5').is(':checked');
+
             var legBox = document.getElementById('dynamic-legend');
-            if (selectedParam === 'none') { legBox.style.display = 'none'; if (isPlaying) stopPlayback(); return; }
+            var legVisual = document.getElementById('leg-visual');
+            legVisual.innerHTML = ''; // Clear existing legend
+
+            // If absolutely nothing is turned on, hide the legend
+            if (baseWeather === 'none' && !showGeo && !showWindVec && !showWindAnim && !showCrutem) {
+                legBox.style.display = 'none';
+                if (isPlaying) stopPlayback();
+                return;
+            }
 
             legBox.style.display = 'block';
             var mytTime = (parseInt(timeState.time) + 8) % 24;
             document.getElementById('leg-time').innerText = `Date: ${timeState.year}-${timeState.month}-${timeState.day} | ${timeState.time}:00 UTC / ${mytTime.toString().padStart(2, '0')}:00 MYT`;
 
             let visualHtml = '';
-            switch(selectedParam) {
-                case 'temp':
-                    document.getElementById('leg-title').innerText = 'Temperature (850 hPa)';
-                    visualHtml = `<div class="legend-scale" style="background: linear-gradient(to right, #fff5f0, #fcbba1, #fb6a4a, #cb181d, #67000d);"></div><div class="legend-labels"><span>Cool</span><span>Hot</span></div>`;
-                    break;
-                case 'geo':
-                    document.getElementById('leg-title').innerText = 'Geopotential Height (850 hPa)';
-                    // UPDATED: Replaced color scale with a contour line icon description
-                    visualHtml = `<div style="display:flex; align-items:center; gap: 10px; margin-top: 10px;">
-                                    <hr style="width: 40px; border: 1.5px solid white; margin: 0;"> 
-                                    <span style="font-size: 12px; color: #ddd;">Contour Lines (meters)</span>
-                                  </div>`;
-                    break;
-                case 'rain':
-                    document.getElementById('leg-title').innerText = 'Specific Rain Water Content';
-                    visualHtml = `<div class="legend-scale" style="background: linear-gradient(to right, #f7fbff, #c6dbef, #6baed6, #2171b5, #08306b);"></div><div class="legend-labels"><span>Light</span><span>Heavy</span></div>`;
-                    break;
-                case 'wind':
-                    document.getElementById('leg-title').innerText = 'Wind Vectors (850 hPa)';
-                    visualHtml = `<div class="legend-scale" style="background: linear-gradient(to right, #3288bd, #66c2a5, #abdda4, #e6f598, #fee08b, #fdae61, #f46d43, #d53e4f);"></div><div class="legend-labels"><span>0 m/s</span><span>>35 m/s</span></div>`;
-                    break;
+
+            // 1. Base Layer Legend
+            if (baseWeather === 'temp') {
+                visualHtml += `
+                <div class="legend-block">
+                    <strong>Temperature (850 hPa)</strong>
+                    <div class="legend-scale" style="background: linear-gradient(to right, #fff5f0, #fcbba1, #fb6a4a, #cb181d, #67000d);"></div>
+                    <div class="legend-labels"><span>Cool</span><span>Hot</span></div>
+                </div>`;
+            } else if (baseWeather === 'rain') {
+                visualHtml += `
+                <div class="legend-block">
+                    <strong>Specific Rain Water Content</strong>
+                    <div class="legend-scale" style="background: linear-gradient(to right, #f7fbff, #c6dbef, #6baed6, #2171b5, #08306b);"></div>
+                    <div class="legend-labels"><span>Light</span><span>Heavy</span></div>
+                </div>`;
             }
-            document.getElementById('leg-visual').innerHTML = visualHtml;
+
+            // 2. Geopotential Overlay Legend
+            if (showGeo) {
+                visualHtml += `
+                <div class="legend-block" style="display:flex; align-items:center; gap: 10px;">
+                    <hr style="width: 30px; border: 1.5px solid #fff; margin: 0;"> 
+                    <span style="font-size: 12px; color: #ddd;"><strong>Geopotential Height</strong><br>Black Contours (m)</span>
+                </div>`;
+            }
+
+            // 3. Wind Vectors Overlay Legend
+            if (showWindVec || showWindAnim) {
+                visualHtml += `
+                <div class="legend-block">
+                    <strong>Wind Speed (850 hPa)</strong>
+                    <div class="legend-scale" style="background: linear-gradient(to right, #3288bd, #66c2a5, #abdda4, #e6f598, #fee08b, #fdae61, #f46d43, #d53e4f);"></div>
+                    <div class="legend-labels"><span>0 m/s</span><span>>35 m/s</span></div>
+                </div>`;
+            }
+
+            // 4. CRUTEM5 Legend
+            if (showCrutem) {
+                visualHtml += `
+                <div class="legend-block" style="display:flex; align-items:center; gap: 10px;">
+                    <span style="color: #4da6ff; font-size:18px;">■</span> 
+                    <span style="font-size: 12px; color: #ddd;"><strong>CRUTEM5</strong><br>Temperature Anomalies</span>
+                </div>`;
+            }
+
+            legVisual.innerHTML = visualHtml;
         }
 
         function startPlayback() {
@@ -414,24 +448,34 @@
         function triggerMapUpdate() {
             var y = timeState.year; var m = timeState.month; var d = timeState.day; var t = timeState.time;
             var timeKey = `${y}${m}${d}_${t}`;
-            var selectedParam = $('input[name="parameter"]:checked').val();
-            var showAnim = $('#toggle-wind-anim').is(':checked');
+            
+            var baseWeather = $('input[name="base_weather"]:checked').val();
+            var showGeo = $('#toggle-geo').is(':checked');
+            var showWindVec = $('#toggle-wind-vec').is(':checked');
+            var showWindAnim = $('#toggle-wind-anim').is(':checked');
 
-            if (currentImageLayer) { map.removeLayer(currentImageLayer); currentImageLayer = null; }
-
-            // Handle Static Maps (Non-Wind)
-            if (selectedParam !== 'none' && selectedParam !== 'wind') {
-                var imageUrl = `data/${selectedParam}_${timeKey}.png`;
-                currentImageLayer = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.65 }).addTo(map);
+            // 1. Process Base Layer (Temperature or Rain)
+            if (currentBaseImageLayer) { map.removeLayer(currentBaseImageLayer); currentBaseImageLayer = null; }
+            if (baseWeather !== 'none') {
+                var baseImageUrl = `data/${baseWeather}_${timeKey}.png`;
+                currentBaseImageLayer = L.imageOverlay(baseImageUrl, imageBounds, { opacity: 0.65 }).addTo(map);
             }
 
-            // Handle Dynamic Data (JSON needed for either animated particles or dynamic vectors)
-            if (selectedParam === 'wind' || showAnim) {
+            // 2. Process Geopotential Layer (Line Overlay)
+            // Adding this AFTER the base layer ensures lines sit on top of the colors
+            if (currentGeoOverlayLayer) { map.removeLayer(currentGeoOverlayLayer); currentGeoOverlayLayer = null; }
+            if (showGeo) {
+                var geoImageUrl = `data/geo_${timeKey}.png`;
+                currentGeoOverlayLayer = L.imageOverlay(geoImageUrl, imageBounds, { opacity: 0.95 }).addTo(map);
+            }
+
+            // 3. Process Dynamic Wind Layers
+            if (showWindVec || showWindAnim) {
                 if (currentJSONTime !== timeKey) {
                     $.getJSON(`data/wind_${timeKey}.json`, function(data) {
                         currentJSONData = data; currentJSONTime = timeKey;
                         applyWindLayers();
-                    }).fail(function() { console.error("Wind data missing for this timestamp"); clearWindLayers(); });
+                    }).fail(function() { console.error("Wind data missing"); clearWindLayers(); });
                 } else { applyWindLayers(); }
             } else { clearWindLayers(); }
 
@@ -446,13 +490,11 @@
         function applyWindLayers() {
             clearWindLayers();
             if (!currentJSONData) return;
-            var selectedParam = $('input[name="parameter"]:checked').val();
-            var showAnim = $('#toggle-wind-anim').is(':checked');
-
-            if (selectedParam === 'wind') {
+            
+            if ($('#toggle-wind-vec').is(':checked')) {
                 customArrowLayer = new L.CanvasWindArrowLayer(currentJSONData).addTo(map);
             }
-            if (showAnim) {
+            if ($('#toggle-wind-anim').is(':checked')) {
                 windVelocityLayer = L.velocityLayer({
                     displayValues: true, displayOptions: { velocityType: 'Wind', position: 'bottomleft' },
                     data: currentJSONData, maxVelocity: 35,
@@ -462,9 +504,7 @@
         }
 
         $('#toggle-crutem5').change(function() {
-            var legendBox = $('#crutem5-legend-box');
             if ($(this).is(':checked')) {
-                legendBox.slideDown(200); 
                 if (!crutem5KmlLayer) {
                     crutem5KmlLayer = omnivore.kml('CRUTEM5-2025-12_gridboxes.kml').on('ready', function() {
                         this.eachLayer(function(layer) {
@@ -479,8 +519,9 @@
                 }
                 map.addLayer(crutem5KmlLayer);
             } else {
-                legendBox.slideUp(200); if (crutem5KmlLayer) map.removeLayer(crutem5KmlLayer);
+                if (crutem5KmlLayer) map.removeLayer(crutem5KmlLayer);
             }
+            triggerMapUpdate();
         });
 
         $('input[name="basemap"]').change(function() {
@@ -488,7 +529,9 @@
             else { map.removeLayer(darkMap); oceanMap.addTo(map); }
         });
 
-        $('input[name="parameter"]').change(triggerMapUpdate);
+        $('input[name="base_weather"]').change(triggerMapUpdate);
+        $('#toggle-geo').change(triggerMapUpdate);
+        $('#toggle-wind-vec').change(triggerMapUpdate);
         $('#toggle-wind-anim').change(triggerMapUpdate);
 
     </script>
