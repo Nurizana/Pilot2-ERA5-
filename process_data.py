@@ -4,6 +4,7 @@ import pandas as pd
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
 from datetime import datetime, timedelta
 import calendar
 import os
@@ -76,7 +77,6 @@ for i in range(len(ds[time_coord])):
         "refTime": str(timestamp)
     }
     
-    # Save JSON for the Animated Particles AND our new Dynamic Canvas Vectors
     output_json = [
         {"header": {**header, "parameterCategory": 2, "parameterNumber": 2}, "data": u_wind.flatten().tolist()},
         {"header": {**header, "parameterCategory": 2, "parameterNumber": 3}, "data": v_wind.flatten().tolist()}
@@ -86,25 +86,32 @@ for i in range(len(ds[time_coord])):
 
     # --- STATIC IMAGE EXPORTS ---
     
-    # 1. Temperature
+    # 1. Temperature (Color shaded base layer)
     temp_data = ds['t'].isel({time_coord: i}).squeeze().values
     plt.imsave(f'data/temp_{file_suffix}.png', temp_data, cmap='coolwarm')
 
-    # 2. Geopotential (Modified for Contours)
+    # 2. Geopotential (Modified for Professional Black Contours)
     geo_data = ds['z'].isel({time_coord: i}).squeeze().values
     gpm_data = geo_data / 9.80665 # Convert to Geopotential Height in meters
     
-    # Create a figure with no frame, matching the 2:1 aspect ratio of the global map
+    # Smooth the data so contour lines look natural and less jagged
+    gpm_smoothed = gaussian_filter(gpm_data, sigma=1.5)
+    
+    # Create a figure with no frame
     fig = plt.figure(frameon=False, figsize=(10, 5))
     ax = plt.Axes(fig, [0., 0., 1., 1.])
     ax.set_axis_off()
     fig.add_axes(ax)
     
-    # Draw contour lines (white for visibility on dark maps)
-    cs = ax.contour(lons, lats, gpm_data, levels=20, colors='white', linewidths=1.0)
-    ax.clabel(cs, inline=True, fontsize=8, fmt='%1.0f')
+    # Define standard meteorological intervals for 850hPa (e.g., every 30 meters)
+    contour_levels = np.arange(1000, 1800, 30)
     
-    # Strictly bound the axes to match Leaflet map bounds
+    # Draw solid black contour lines like the reference image
+    cs = ax.contour(lons, lats, gpm_smoothed, levels=contour_levels, colors='black', linewidths=1.2, alpha=0.85)
+    
+    # Add inline labels to the contours
+    ax.clabel(cs, inline=True, fontsize=9, fmt='%1.0f', colors='black')
+    
     ax.set_xlim(0, 360)
     ax.set_ylim(-90, 90)
     
@@ -112,7 +119,7 @@ for i in range(len(ds[time_coord])):
     fig.savefig(f'data/geo_{file_suffix}.png', transparent=True, format='png', pad_inches=0)
     plt.close(fig)
 
-    # 3. Rain
+    # 3. Rain (Color shaded base layer)
     rain_data = ds['crwc'].isel({time_coord: i}).squeeze().values
     plt.imsave(f'data/rain_{file_suffix}.png', rain_data, cmap='Blues')
 
