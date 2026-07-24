@@ -166,7 +166,6 @@
         .time-item:hover { background: #333; color: #fff; }
         .time-item.active { background: #4da6ff; color: #000; font-weight: bold; }
 
-        /* Legend styling for Section 5 */
         #crutem5-legend-box {
             display: none;
             margin-top: 10px;
@@ -179,16 +178,54 @@
             line-height: 1.4;
         }
 
-        /* Popup styling for KML data */
         .leaflet-popup-content {
             color: #333;
             font-size: 13px;
         }
+
+        /* Dynamic Legend Styling */
+        #dynamic-legend {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            background: rgba(20, 20, 20, 0.9);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            z-index: 1000;
+            display: none;
+            width: 260px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            font-size: 13px;
+        }
+        .legend-title { font-weight: bold; font-size: 15px; color: #4da6ff; margin-bottom: 5px; }
+        .legend-time { font-size: 12px; color: #bbb; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 8px; }
+        .legend-scale { width: 100%; height: 15px; border-radius: 3px; margin-bottom: 5px; }
+        .legend-labels { display: flex; justify-content: space-between; font-size: 11px; color: #ddd; }
+        
+        /* Play Button Styling */
+        .play-control { margin-top: 15px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #444; padding-top: 10px; }
+        #play-btn { background: #4da6ff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; color: #000; transition: 0.2s; }
+        #play-btn:hover { background: #66b5ff; }
+        #play-btn.playing { background: #ff4d4d; color: white; }
+        #play-btn.playing:hover { background: #ff6666; }
     </style>
 </head>
 <body>
     <div id="map"></div>
     
+    <!-- Dynamic Interactive Legend -->
+    <div id="dynamic-legend">
+        <div class="legend-title" id="leg-title">Parameter</div>
+        <div class="legend-time" id="leg-time">Date & Time</div>
+        <div id="leg-visual"></div>
+        <div class="play-control">
+            <button id="play-btn">▶ Play Month</button>
+            <span id="play-status" style="font-size: 11px; color:#aaa;"></span>
+        </div>
+    </div>
+
     <div id="control-panel">
         <div id="toggle-trigger">OPTIONS</div>
         
@@ -300,6 +337,10 @@
         var imageBounds = [[90, 0], [-90, 360]]; 
 
         let timeState = { year: '2026', month: '01', day: '01', time: '00' };
+        
+        // Playback Variables
+        let playInterval = null;
+        let isPlaying = false;
 
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const timeOptions = [
@@ -407,9 +448,109 @@
 
         initTimeSelectors();
 
+        function updateLegend() {
+            var selectedParam = $('input[name="parameter"]:checked').val();
+            var legBox = document.getElementById('dynamic-legend');
+            var legTitle = document.getElementById('leg-title');
+            var legTime = document.getElementById('leg-time');
+            var legVisual = document.getElementById('leg-visual');
+
+            // Hide legend and stop playback if no parameter is selected
+            if (selectedParam === 'none') {
+                legBox.style.display = 'none';
+                if (isPlaying) stopPlayback();
+                return;
+            }
+
+            legBox.style.display = 'block';
+            
+            // Format Time (UTC / MYT)
+            var mytTime = (parseInt(timeState.time) + 8) % 24;
+            var mytTimeStr = mytTime.toString().padStart(2, '0') + ':00';
+            legTime.innerText = `Date: ${timeState.year}-${timeState.month}-${timeState.day} | ${timeState.time}:00 UTC / ${mytTimeStr} MYT`;
+
+            let visualHtml = '';
+
+            // Inject custom styles/gradients based on parameter
+            switch(selectedParam) {
+                case 'temp':
+                    legTitle.innerText = 'Temperature (850 hPa)';
+                    visualHtml = `
+                        <div class="legend-scale" style="background: linear-gradient(to right, #fff5f0, #fcbba1, #fb6a4a, #cb181d, #67000d);"></div>
+                        <div class="legend-labels"><span>Cool</span><span>Hot</span></div>
+                    `;
+                    break;
+                case 'geo':
+                    legTitle.innerText = 'Geopotential Height';
+                    visualHtml = `
+                        <div class="legend-scale" style="background: linear-gradient(to right, #006837, #addd8e, #ffffcc, #41b6c4, #225ea8);"></div>
+                        <div class="legend-labels"><span>Low</span><span>High</span></div>
+                    `;
+                    break;
+                case 'rain':
+                    legTitle.innerText = 'Specific Rain Water Content';
+                    visualHtml = `
+                        <div class="legend-scale" style="background: linear-gradient(to right, #f7fbff, #c6dbef, #6baed6, #2171b5, #08306b);"></div>
+                        <div class="legend-labels"><span>Light</span><span>Heavy</span></div>
+                    `;
+                    break;
+                case 'wind':
+                    legTitle.innerText = 'Wind Layer (Vectors)';
+                    visualHtml = `
+                        <div style="display:flex; align-items:center; gap: 10px; font-size:12px; margin-bottom:5px;">
+                            <span style="font-size:18px;">➔</span> 
+                            <span>Direction & Magnitude</span>
+                        </div>
+                        <div class="legend-labels"><span>Requires backend rendering</span></div>
+                    `;
+                    break;
+            }
+            legVisual.innerHTML = visualHtml;
+        }
+
+        // Playback Functions
+        function startPlayback() {
+            isPlaying = true;
+            let playBtn = document.getElementById('play-btn');
+            playBtn.innerText = '⏸ Pause';
+            playBtn.classList.add('playing');
+            document.getElementById('play-status').innerText = 'Animating...';
+            
+            playInterval = setInterval(function() {
+                let currentDay = parseInt(timeState.day);
+                let maxDays = new Date(parseInt(timeState.year), parseInt(timeState.month), 0).getDate();
+                
+                // Increment day, loop back to 1 if end of month
+                if (currentDay < maxDays) {
+                    timeState.day = (currentDay + 1).toString().padStart(2, '0');
+                } else {
+                    timeState.day = '01'; 
+                }
+                
+                // Update UI visually
+                updateActiveSelection('list-day', 'display-day', timeState.day, timeState.day);
+                triggerMapUpdate();
+            }, 1000); // 1000ms = 1 second per day
+        }
+
+        function stopPlayback() {
+            isPlaying = false;
+            let playBtn = document.getElementById('play-btn');
+            playBtn.innerText = '▶ Play Month';
+            playBtn.classList.remove('playing');
+            document.getElementById('play-status').innerText = '';
+            clearInterval(playInterval);
+        }
+
+        document.getElementById('play-btn').addEventListener('click', function() {
+            if (isPlaying) stopPlayback();
+            else startPlayback();
+        });
+
         function triggerMapUpdate() {
             updateStaticLayer();
             updateWindLayer();
+            updateLegend();
         }
 
         function updateStaticLayer() {
@@ -459,28 +600,24 @@
             }
         }
 
-        // CRUTEM5 KML Toggle Logic
         $('#toggle-crutem5').change(function() {
             var isChecked = $(this).is(':checked');
             var legendBox = $('#crutem5-legend-box');
             
             if (isChecked) {
-                legendBox.slideDown(200); // Show legend
+                legendBox.slideDown(200); 
                 
                 if (!crutem5KmlLayer) {
-                    // Update this string with the exact file name in your repo
                     var kmlUrl = 'CRUTEM5-2025-12_gridboxes.kml'; 
                     
                     crutem5KmlLayer = omnivore.kml(kmlUrl)
                         .on('ready', function() {
-                            // Loop through the data to attach popups automatically based on KML properties
                             this.eachLayer(function(layer) {
                                 if (layer.feature && layer.feature.properties) {
                                     var props = layer.feature.properties;
                                     var popupHTML = '<div style="max-height: 150px; overflow-y: auto;"><b>Gridbox Info</b><br>';
                                     for (var key in props) {
                                         if (props.hasOwnProperty(key)) {
-                                            // Format the KML attributes nicely
                                             popupHTML += `<strong>${key}:</strong> ${props[key]}<br>`;
                                         }
                                     }
@@ -495,7 +632,7 @@
                 }
                 map.addLayer(crutem5KmlLayer);
             } else {
-                legendBox.slideUp(200); // Hide legend
+                legendBox.slideUp(200); 
                 if (crutem5KmlLayer) {
                     map.removeLayer(crutem5KmlLayer);
                 }
@@ -512,7 +649,10 @@
             }
         });
 
-        $('input[name="parameter"]').change(updateStaticLayer);
+        $('input[name="parameter"]').change(function() {
+            triggerMapUpdate(); // Call trigger Map update directly so legend switches immediately
+        });
+        
         $('#toggle-wind-anim').change(updateWindLayer);
 
     </script>
