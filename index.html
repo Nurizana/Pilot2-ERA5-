@@ -143,7 +143,7 @@
                 <h3>3. Weather Parameter</h3>
                 <label><input type="radio" name="parameter" value="none" checked> None (Base Map Only)</label>
                 <label><input type="radio" name="parameter" value="temp"> Temperature</label>
-                <label><input type="radio" name="parameter" value="geo"> Geopotential</label>
+                <label><input type="radio" name="parameter" value="geo"> Geopotential Height</label>
                 <label><input type="radio" name="parameter" value="rain"> Specific Rain Water Content</label>
                 <label><input type="radio" name="parameter" value="wind"> Wind Vectors</label>
             </div>
@@ -199,7 +199,6 @@
                 ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
                 var zoom = this._map.getZoom();
                 
-                // Adjust vector density based on zoom level
                 var step = 1;
                 if (zoom <= 4) step = 12; else if (zoom <= 5) step = 8; else if (zoom <= 6) step = 4; else if (zoom <= 7) step = 2;
                 
@@ -218,7 +217,7 @@
                     var lat = la1 - (y * dy);
                     for (var x = 0; x < nx; x += step) {
                         var lon = lo1 + (x * dx);
-                        var mapLon = lon > 180 ? lon - 360 : lon; // Standardize for mapping wrap
+                        var mapLon = lon > 180 ? lon - 360 : lon; 
                         
                         var pos = this._map.latLngToContainerPoint([lat, mapLon]);
                         if (pos.x < -20 || pos.x > this._canvas.width + 20 || pos.y < -20 || pos.y > this._canvas.height + 20) continue;
@@ -228,10 +227,8 @@
                         var speed = Math.sqrt(u*u + v*v);
                         if (speed < 1.0) continue; 
                         
-                        // Calculate angle mapped to standard screen orientation
                         var angle = Math.atan2(-v, u); 
                         
-                        // INCREASED ARROW LENGTH: Scaled up base length and multiplier for speed/zoom
                         var zoomBoost = (zoom - 4) * 2; 
                         var arrowLen = Math.min(35, 14 + (zoomBoost > 0 ? zoomBoost : 0) + (speed * 0.4)); 
                         
@@ -239,17 +236,14 @@
                         ctx.translate(pos.x, pos.y); ctx.rotate(angle);
                         ctx.beginPath();
                         
-                        // CENTERED DRAWING: Draw the main line starting from -arrowLen/2 to +arrowLen/2
                         ctx.moveTo(-arrowLen / 2, 0); 
                         ctx.lineTo(arrowLen / 2, 0); 
                         
-                        // Draw the arrowhead proportional to the new length
                         ctx.lineTo((arrowLen / 2) - 7, -5); 
                         ctx.moveTo(arrowLen / 2, 0); 
                         ctx.lineTo((arrowLen / 2) - 7, 5);
                         
                         ctx.strokeStyle = getColor(speed); 
-                        // INCREASED ARROW THICKNESS: Changed from 1.5 to 2.5
                         ctx.lineWidth = 2.5; 
                         ctx.stroke();
                         ctx.restore();
@@ -372,8 +366,12 @@
                     visualHtml = `<div class="legend-scale" style="background: linear-gradient(to right, #fff5f0, #fcbba1, #fb6a4a, #cb181d, #67000d);"></div><div class="legend-labels"><span>Cool</span><span>Hot</span></div>`;
                     break;
                 case 'geo':
-                    document.getElementById('leg-title').innerText = 'Geopotential Height';
-                    visualHtml = `<div class="legend-scale" style="background: linear-gradient(to right, #006837, #addd8e, #ffffcc, #41b6c4, #225ea8);"></div><div class="legend-labels"><span>Low</span><span>High</span></div>`;
+                    document.getElementById('leg-title').innerText = 'Geopotential Height (850 hPa)';
+                    // UPDATED: Replaced color scale with a contour line icon description
+                    visualHtml = `<div style="display:flex; align-items:center; gap: 10px; margin-top: 10px;">
+                                    <hr style="width: 40px; border: 1.5px solid white; margin: 0;"> 
+                                    <span style="font-size: 12px; color: #ddd;">Contour Lines (meters)</span>
+                                  </div>`;
                     break;
                 case 'rain':
                     document.getElementById('leg-title').innerText = 'Specific Rain Water Content';
