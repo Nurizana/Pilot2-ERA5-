@@ -55,6 +55,9 @@ ds = xr.open_dataset(output_file)
 ds = ds.assign_coords(longitude=(ds.longitude % 360)).sortby('longitude')
 time_coord = 'valid_time' if 'valid_time' in ds.coords else 'time'
 
+# Create meshgrid for contours outside the loop for efficiency
+lons, lats = np.meshgrid(ds.longitude.values, ds.latitude.values)
+
 # Loop through every day (timestep) in the downloaded file
 for i in range(len(ds[time_coord])):
     timestamp = pd.to_datetime(ds[time_coord][i].values)
@@ -74,7 +77,6 @@ for i in range(len(ds[time_coord])):
     }
     
     # Save JSON for the Animated Particles AND our new Dynamic Canvas Vectors
-    # We no longer export a static PNG for wind, as the browser handles it dynamically!
     output_json = [
         {"header": {**header, "parameterCategory": 2, "parameterNumber": 2}, "data": u_wind.flatten().tolist()},
         {"header": {**header, "parameterCategory": 2, "parameterNumber": 3}, "data": v_wind.flatten().tolist()}
@@ -82,13 +84,35 @@ for i in range(len(ds[time_coord])):
     with open(f"data/wind_{file_suffix}.json", "w") as f:
         json.dump(output_json, f)
 
-    # --- STATIC IMAGE EXPORTS (Temp, Geo, Rain) ---
+    # --- STATIC IMAGE EXPORTS ---
+    
+    # 1. Temperature
     temp_data = ds['t'].isel({time_coord: i}).squeeze().values
     plt.imsave(f'data/temp_{file_suffix}.png', temp_data, cmap='coolwarm')
 
+    # 2. Geopotential (Modified for Contours)
     geo_data = ds['z'].isel({time_coord: i}).squeeze().values
-    plt.imsave(f'data/geo_{file_suffix}.png', geo_data, cmap='viridis')
+    gpm_data = geo_data / 9.80665 # Convert to Geopotential Height in meters
+    
+    # Create a figure with no frame, matching the 2:1 aspect ratio of the global map
+    fig = plt.figure(frameon=False, figsize=(10, 5))
+    ax = plt.Axes(fig, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    fig.add_axes(ax)
+    
+    # Draw contour lines (white for visibility on dark maps)
+    cs = ax.contour(lons, lats, gpm_data, levels=20, colors='white', linewidths=1.0)
+    ax.clabel(cs, inline=True, fontsize=8, fmt='%1.0f')
+    
+    # Strictly bound the axes to match Leaflet map bounds
+    ax.set_xlim(0, 360)
+    ax.set_ylim(-90, 90)
+    
+    # Save as transparent PNG
+    fig.savefig(f'data/geo_{file_suffix}.png', transparent=True, format='png', pad_inches=0)
+    plt.close(fig)
 
+    # 3. Rain
     rain_data = ds['crwc'].isel({time_coord: i}).squeeze().values
     plt.imsave(f'data/rain_{file_suffix}.png', rain_data, cmap='Blues')
 
