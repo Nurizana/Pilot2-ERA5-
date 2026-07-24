@@ -5,217 +5,89 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
-    <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    
-    <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    
-    <!-- Leaflet Velocity -->
     <script src="https://cdn.jsdelivr.net/npm/leaflet-velocity@1.6.0/dist/leaflet-velocity.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-velocity@1.6.0/dist/leaflet-velocity.min.css"/>
-    
-    <!-- Leaflet Omnivore (For KML Support) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-omnivore/0.3.4/leaflet-omnivore.min.js"></script>
     
     <style>
-        body, html { 
-            margin: 0; padding: 0; height: 100%; 
-            font-family: Arial, sans-serif; overflow: hidden; 
-            background: #111;
-        }
-        
+        body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; overflow: hidden; background: #111; }
         #map { width: 100%; height: 100%; z-index: 1; }
         
         #control-panel {
-            position: absolute; 
-            top: 20px; 
-            right: 0; 
-            width: 320px;
-            height: calc(100% - 40px);
-            background: rgba(30, 30, 30, 0.95); 
-            color: #fff; 
-            z-index: 1000;
-            transform: translateX(100%);
-            transition: transform 0.4s ease-in-out; 
-            border-radius: 10px 0 0 10px;
-            box-shadow: -2px 0 10px rgba(0,0,0,0.5); 
+            position: absolute; top: 20px; right: 0; width: 320px; height: calc(100% - 40px);
+            background: rgba(30, 30, 30, 0.95); color: #fff; z-index: 1000;
+            transform: translateX(100%); transition: transform 0.4s ease-in-out; 
+            border-radius: 10px 0 0 10px; box-shadow: -2px 0 10px rgba(0,0,0,0.5); 
         }
-
-        #control-panel.open {
-            transform: translateX(0);
-        }
+        #control-panel.open { transform: translateX(0); }
 
         #toggle-trigger { 
-            position: absolute; 
-            left: -50px;
-            top: 0; 
-            width: 50px; 
-            height: 100%; 
-            background: rgba(30, 30, 30, 0.95);
-            border-radius: 10px 0 0 10px;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            writing-mode: vertical-rl;
-            text-orientation: upright;
-            letter-spacing: 8px;
-            font-weight: bold;
-            font-size: 16px;
-            cursor: pointer;
-            box-shadow: -2px 0 10px rgba(0,0,0,0.5);
-            user-select: none;
-            -webkit-user-select: none;
+            position: absolute; left: -50px; top: 0; width: 50px; height: 100%; 
+            background: rgba(30, 30, 30, 0.95); border-radius: 10px 0 0 10px; color: white;
+            display: flex; align-items: center; justify-content: center; writing-mode: vertical-rl;
+            text-orientation: upright; letter-spacing: 8px; font-weight: bold; font-size: 16px;
+            cursor: pointer; box-shadow: -2px 0 10px rgba(0,0,0,0.5); user-select: none;
         }
 
-        .panel-content {
-            padding: 20px;
-            height: 100%;
-            overflow-y: auto;
-            box-sizing: border-box;
-        }
-
+        .panel-content { padding: 20px; height: 100%; overflow-y: auto; box-sizing: border-box; }
         .panel-section { margin-bottom: 25px; border-bottom: 1px solid #444; padding-bottom: 15px; }
         .panel-section:last-child { border-bottom: none; }
         .panel-section h3 { margin-top: 0; font-size: 16px; color: #4da6ff; }
         label { display: block; margin-bottom: 12px; cursor: pointer; font-size: 14px; }
         
-        .custom-time-selector {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        
-        .time-row {
-            display: flex;
-            align-items: center;
-            position: relative;
-        }
+        .custom-time-selector { display: flex; flex-direction: column; gap: 12px; }
+        .time-row { display: flex; align-items: center; position: relative; }
+        #row-year { z-index: 4; } #row-month { z-index: 3; } #row-day { z-index: 2; } #row-time { z-index: 1; }
 
-        #row-year { z-index: 4; }
-        #row-month { z-index: 3; }
-        #row-day { z-index: 2; }
-        #row-time { z-index: 1; }
-
-        .time-label {
-            width: 120px;
-            font-size: 14px;
-            color: #ddd;
-        }
-
-        .time-dropdown-container {
-            flex: 1;
-            position: relative;
-        }
-
+        .time-label { width: 120px; font-size: 14px; color: #ddd; }
+        .time-dropdown-container { flex: 1; position: relative; }
         .time-selected {
-            background: #4da6ff;
-            color: #000;
-            font-weight: bold;
-            font-size: 14px;
-            padding: 8px;
-            text-align: center;
-            border-radius: 4px;
-            cursor: pointer;
-            user-select: none;
-            transition: background 0.2s;
+            background: #4da6ff; color: #000; font-weight: bold; font-size: 14px; padding: 8px;
+            text-align: center; border-radius: 4px; cursor: pointer; user-select: none; transition: background 0.2s;
         }
-
-        .time-selected:hover {
-            background: #66b5ff;
-        }
+        .time-selected:hover { background: #66b5ff; }
 
         .time-list {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            max-height: 160px;
-            overflow-y: auto;
-            background: #222;
-            border: 1px solid #555;
-            border-top: none;
-            border-radius: 0 0 4px 4px;
-            display: none; 
-            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
-            scrollbar-width: thin;
+            position: absolute; top: 100%; left: 0; right: 0; max-height: 160px; overflow-y: auto;
+            background: #222; border: 1px solid #555; border-top: none; border-radius: 0 0 4px 4px;
+            display: none; box-shadow: 0 4px 10px rgba(0,0,0,0.6); scrollbar-width: thin;
         }
-
-        .time-dropdown-container:hover .time-list {
-            display: block;
-        }
-        
+        .time-dropdown-container:hover .time-list { display: block; }
         .time-list::-webkit-scrollbar { width: 6px; }
         .time-list::-webkit-scrollbar-thumb { background: #666; border-radius: 3px; }
-        .time-list::-webkit-scrollbar-track { background: #222; }
-
-        .time-item {
-            padding: 8px;
-            font-size: 14px;
-            text-align: center;
-            cursor: pointer;
-            color: #aaa;
-            transition: background 0.2s, color 0.2s;
-            user-select: none;
-            border-bottom: 1px solid #333;
-        }
-
+        
+        .time-item { padding: 8px; font-size: 14px; text-align: center; cursor: pointer; color: #aaa; border-bottom: 1px solid #333; }
         .time-item:last-child { border-bottom: none; }
         .time-item:hover { background: #333; color: #fff; }
         .time-item.active { background: #4da6ff; color: #000; font-weight: bold; }
 
         #crutem5-legend-box {
-            display: none;
-            margin-top: 10px;
-            padding: 10px;
-            background: rgba(20, 20, 20, 0.8);
-            border-radius: 4px;
-            border: 1px solid #555;
-            font-size: 12px;
-            color: #ddd;
-            line-height: 1.4;
+            display: none; margin-top: 10px; padding: 10px; background: rgba(20, 20, 20, 0.8);
+            border-radius: 4px; border: 1px solid #555; font-size: 12px; color: #ddd; line-height: 1.4;
         }
 
-        .leaflet-popup-content {
-            color: #333;
-            font-size: 13px;
-        }
-
-        /* Dynamic Legend Styling */
         #dynamic-legend {
-            position: absolute;
-            bottom: 30px;
-            left: 20px;
-            background: rgba(20, 20, 20, 0.9);
-            color: white;
-            padding: 15px;
-            border-radius: 8px;
-            border: 1px solid #444;
-            z-index: 1000;
-            display: none;
-            width: 260px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-            font-size: 13px;
+            position: absolute; bottom: 30px; left: 20px; background: rgba(20, 20, 20, 0.9);
+            color: white; padding: 15px; border-radius: 8px; border: 1px solid #444; z-index: 1000;
+            display: none; width: 260px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); font-size: 13px;
         }
         .legend-title { font-weight: bold; font-size: 15px; color: #4da6ff; margin-bottom: 5px; }
         .legend-time { font-size: 12px; color: #bbb; margin-bottom: 15px; border-bottom: 1px solid #444; padding-bottom: 8px; }
         .legend-scale { width: 100%; height: 15px; border-radius: 3px; margin-bottom: 5px; }
         .legend-labels { display: flex; justify-content: space-between; font-size: 11px; color: #ddd; }
         
-        /* Play Button Styling */
         .play-control { margin-top: 15px; display: flex; align-items: center; gap: 10px; border-top: 1px solid #444; padding-top: 10px; }
         #play-btn { background: #4da6ff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; color: #000; transition: 0.2s; }
         #play-btn:hover { background: #66b5ff; }
         #play-btn.playing { background: #ff4d4d; color: white; }
-        #play-btn.playing:hover { background: #ff6666; }
     </style>
 </head>
 <body>
     <div id="map"></div>
     
-    <!-- Dynamic Interactive Legend -->
     <div id="dynamic-legend">
         <div class="legend-title" id="leg-title">Parameter</div>
         <div class="legend-time" id="leg-time">Date & Time</div>
@@ -228,14 +100,12 @@
 
     <div id="control-panel">
         <div id="toggle-trigger">OPTIONS</div>
-        
         <div class="panel-content">
             <div class="panel-section">
                 <h3>1. Base Map</h3>
                 <label><input type="radio" name="basemap" value="dark" checked> Dark Base Map</label>
                 <label><input type="radio" name="basemap" value="ocean"> Oceans Base Map</label>
             </div>
-
             <div class="panel-section">
                 <h3>2. Time Selection</h3>
                 <div class="custom-time-selector">
@@ -246,7 +116,6 @@
                             <div class="time-list" id="list-year"></div>
                         </div>
                     </div>
-                    
                     <div class="time-row" id="row-month">
                         <div class="time-label">Month:</div>
                         <div class="time-dropdown-container">
@@ -254,7 +123,6 @@
                             <div class="time-list" id="list-month"></div>
                         </div>
                     </div>
-                    
                     <div class="time-row" id="row-day">
                         <div class="time-label">Day:</div>
                         <div class="time-dropdown-container">
@@ -262,7 +130,6 @@
                             <div class="time-list" id="list-day"></div>
                         </div>
                     </div>
-                    
                     <div class="time-row" id="row-time">
                         <div class="time-label">Time (UTC/MYT):</div>
                         <div class="time-dropdown-container">
@@ -272,388 +139,349 @@
                     </div>
                 </div>
             </div>
-
             <div class="panel-section">
                 <h3>3. Weather Parameter</h3>
                 <label><input type="radio" name="parameter" value="none" checked> None (Base Map Only)</label>
                 <label><input type="radio" name="parameter" value="temp"> Temperature</label>
                 <label><input type="radio" name="parameter" value="geo"> Geopotential</label>
                 <label><input type="radio" name="parameter" value="rain"> Specific Rain Water Content</label>
-                <label><input type="radio" name="parameter" value="wind"> Wind Layer</label>
+                <label><input type="radio" name="parameter" value="wind"> Wind Vectors</label>
             </div>
-
             <div class="panel-section">
                 <h3>4. Wind Overlay</h3>
-                <label><input type="checkbox" id="toggle-wind-anim"> Animated Wind Particles (850 hPa)</label>
+                <label><input type="checkbox" id="toggle-wind-anim"> Animated Particles (850 hPa)</label>
             </div>
-
             <div class="panel-section">
                 <h3>5. Observation Data</h3>
                 <label><input type="checkbox" id="toggle-crutem5"> CRUTEM5 Gridboxes</label>
-                
                 <div id="crutem5-legend-box">
                     <strong>CRUTEM5 Dataset</strong><br>
                     <span style="color: #4da6ff;">■</span> Temperature Anomalies<br>
                     <hr style="border: 0; border-top: 1px solid #444; margin: 8px 0;">
-                    <em>Click on any highlighted gridbox on the map to view detailed observation metrics.</em>
+                    <em>Click on any highlighted gridbox to view detailed observation metrics.</em>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        var panel = document.getElementById('control-panel');
-        var trigger = document.getElementById('toggle-trigger');
+        // --- CUSTOM CANVAS LAYER FOR DYNAMIC WIND ARROWS ---
+        L.CanvasWindArrowLayer = L.Layer.extend({
+            initialize: function(data, options) {
+                this._uData = data[0].data; this._vData = data[1].data; this._header = data[0].header;
+                L.setOptions(this, options);
+            },
+            onAdd: function(map) {
+                this._map = map;
+                this._canvas = L.DomUtil.create('canvas', 'leaflet-wind-arrow-layer');
+                this._canvas.style.position = 'absolute'; this._canvas.style.top = '0';
+                this._canvas.style.left = '0'; this._canvas.style.pointerEvents = 'none'; this._canvas.style.zIndex = '400';
+                var size = this._map.getSize();
+                this._canvas.width = size.x; this._canvas.height = size.y;
+                map.getPanes().overlayPane.appendChild(this._canvas);
+                map.on('moveend', this._reset, this); map.on('resize', this._resize, this);
+                this._reset();
+            },
+            onRemove: function(map) {
+                map.getPanes().overlayPane.removeChild(this._canvas);
+                map.off('moveend', this._reset, this); map.off('resize', this._resize, this);
+            },
+            _resize: function() {
+                var size = this._map.getSize(); this._canvas.width = size.x; this._canvas.height = size.y; this._reset();
+            },
+            _reset: function() {
+                var topLeft = this._map.containerPointToLayerPoint([0, 0]);
+                L.DomUtil.setPosition(this._canvas, topLeft);
+                this._draw();
+            },
+            _draw: function() {
+                var ctx = this._canvas.getContext('2d');
+                ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+                var zoom = this._map.getZoom();
+                
+                // Adjust vector density based on zoom level
+                var step = 1;
+                if (zoom <= 4) step = 12; else if (zoom <= 5) step = 8; else if (zoom <= 6) step = 4; else if (zoom <= 7) step = 2;
+                
+                var nx = this._header.nx; var ny = this._header.ny;
+                var lo1 = this._header.lo1; var la1 = this._header.la1;
+                var dx = this._header.dx; var dy = this._header.dy;
+                
+                function getColor(speed) {
+                    if (speed < 5) return '#3288bd'; if (speed < 10) return '#66c2a5';
+                    if (speed < 15) return '#abdda4'; if (speed < 20) return '#e6f598';
+                    if (speed < 25) return '#fee08b'; if (speed < 30) return '#fdae61';
+                    if (speed < 35) return '#f46d43'; return '#d53e4f';
+                }
 
-        trigger.addEventListener('click', function(e) {
-            panel.classList.toggle('open');
-            e.stopPropagation(); 
-        });
-
-        var map = L.map('map', { zoomControl: false }).setView([5.0, 114.0], 5);
-        L.control.zoom({ position: 'topleft' }).addTo(map);
-
-        map.on('click', function() {
-            if (panel.classList.contains('open')) {
-                panel.classList.remove('open');
+                for (var y = 0; y < ny; y += step) {
+                    var lat = la1 - (y * dy);
+                    for (var x = 0; x < nx; x += step) {
+                        var lon = lo1 + (x * dx);
+                        var mapLon = lon > 180 ? lon - 360 : lon; // Standardize for mapping wrap
+                        
+                        var pos = this._map.latLngToContainerPoint([lat, mapLon]);
+                        if (pos.x < -20 || pos.x > this._canvas.width + 20 || pos.y < -20 || pos.y > this._canvas.height + 20) continue;
+                        
+                        var idx = y * nx + x;
+                        var u = this._uData[idx]; var v = this._vData[idx];
+                        var speed = Math.sqrt(u*u + v*v);
+                        if (speed < 1.0) continue; 
+                        
+                        // Calculate angle mapped to standard screen orientation
+                        var angle = Math.atan2(-v, u); 
+                        
+                        // Calculate arrow length based on zoom + speed to prevent overlap
+                        var zoomBoost = (zoom - 4) * 1.5; 
+                        var arrowLen = Math.min(22, 6 + (zoomBoost > 0 ? zoomBoost : 0) + (speed * 0.25)); 
+                        
+                        ctx.save();
+                        ctx.translate(pos.x, pos.y); ctx.rotate(angle);
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0); ctx.lineTo(arrowLen, 0); 
+                        ctx.lineTo(arrowLen - 5, -4); ctx.moveTo(arrowLen, 0); ctx.lineTo(arrowLen - 5, 4);
+                        
+                        ctx.strokeStyle = getColor(speed); ctx.lineWidth = 1.5; ctx.stroke();
+                        ctx.restore();
+                    }
+                }
             }
         });
+        // --- END CUSTOM CANVAS LAYER ---
 
+        var panel = document.getElementById('control-panel');
+        var trigger = document.getElementById('toggle-trigger');
+        trigger.addEventListener('click', function(e) { panel.classList.toggle('open'); e.stopPropagation(); });
+
+        var map = L.map('map', { zoomControl: false, worldCopyJump: true }).setView([5.0, 114.0], 5);
+        L.control.zoom({ position: 'topleft' }).addTo(map);
+
+        map.on('click', function() { if (panel.classList.contains('open')) panel.classList.remove('open'); });
         panel.addEventListener('click', function(e) { e.stopPropagation(); });
         
-        var darkBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}');
-        var darkLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}');
-        var darkMap = L.layerGroup([darkBase, darkLabels]);
+        var darkMap = L.layerGroup([
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}')
+        ]).addTo(map);
 
-        var oceanBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}');
-        var oceanLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}');
-        var oceanMap = L.layerGroup([oceanBase, oceanLabels]);
+        var oceanMap = L.layerGroup([
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}'),
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}')
+        ]);
 
-        darkMap.addTo(map);
-
-        var currentImageLayer = null;
-        var windVelocityLayer = null;
-        var crutem5KmlLayer = null; 
+        var currentImageLayer = null, windVelocityLayer = null, customArrowLayer = null, crutem5KmlLayer = null; 
         var imageBounds = [[90, 0], [-90, 360]]; 
+        
+        var currentJSONData = null;
+        var currentJSONTime = null;
 
         let timeState = { year: '2026', month: '01', day: '01', time: '00' };
-        
-        // Playback Variables
-        let playInterval = null;
-        let isPlaying = false;
+        let playInterval = null; let isPlaying = false;
 
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         const timeOptions = [
-            { val: '00', label: '00:00/08:00' },
-            { val: '06', label: '06:00/14:00' },
-            { val: '12', label: '12:00/20:00' },
-            { val: '18', label: '18:00/02:00' }
+            { val: '00', label: '00:00/08:00' }, { val: '06', label: '06:00/14:00' },
+            { val: '12', label: '12:00/20:00' }, { val: '18', label: '18:00/02:00' }
         ];
 
         function renderList(containerId, displayId, items, selectedValue, onSelect) {
-            const container = document.getElementById(containerId);
-            const display = document.getElementById(displayId);
-            container.innerHTML = '';
-            let selectedLabel = '';
-
+            const container = document.getElementById(containerId); const display = document.getElementById(displayId);
+            container.innerHTML = ''; let selectedLabel = '';
             items.forEach(item => {
-                if (item.value === selectedValue) { selectedLabel = item.label; }
-                
+                if (item.value === selectedValue) selectedLabel = item.label;
                 let div = document.createElement('div');
                 div.className = 'time-item' + (item.value === selectedValue ? ' active' : '');
-                div.innerText = item.label;
-                div.dataset.value = item.value;
-                
+                div.innerText = item.label; div.dataset.value = item.value;
                 div.onclick = function() {
-                    container.style.display = 'none';
-                    setTimeout(() => container.style.display = '', 100); 
+                    container.style.display = 'none'; setTimeout(() => container.style.display = '', 100); 
                     onSelect(item.value, item.label);
                 };
                 container.appendChild(div);
             });
-
-            if (selectedLabel) { display.innerText = selectedLabel; }
+            if (selectedLabel) display.innerText = selectedLabel;
         }
 
         function updateActiveSelection(containerId, displayId, selectedValue, selectedLabel) {
             const container = document.getElementById(containerId);
-            const display = document.getElementById(displayId);
             const items = container.getElementsByClassName('time-item');
-            
-            display.innerText = selectedLabel;
-
+            document.getElementById(displayId).innerText = selectedLabel;
             for (let item of items) {
                 if (item.dataset.value === selectedValue) {
-                    item.classList.add('active');
-                    item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                } else {
-                    item.classList.remove('active');
-                }
+                    item.classList.add('active'); item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                } else { item.classList.remove('active'); }
             }
         }
 
         function updateDaysList() {
             let maxDays = new Date(parseInt(timeState.year), parseInt(timeState.month), 0).getDate();
-            
-            if (parseInt(timeState.day) > maxDays) {
-                timeState.day = maxDays.toString().padStart(2, '0');
-            }
-            
+            if (parseInt(timeState.day) > maxDays) timeState.day = maxDays.toString().padStart(2, '0');
             let days = [];
             for (let i = 1; i <= maxDays; i++) {
-                let val = i.toString().padStart(2, '0');
-                days.push({ label: val, value: val });
+                let val = i.toString().padStart(2, '0'); days.push({ label: val, value: val });
             }
-            
             renderList('list-day', 'display-day', days, timeState.day, (val, label) => {
-                timeState.day = val;
-                updateActiveSelection('list-day', 'display-day', timeState.day, label);
+                timeState.day = val; updateActiveSelection('list-day', 'display-day', timeState.day, label);
                 triggerMapUpdate();
             });
         }
 
         function initTimeSelectors() {
-            let years = [];
-            for (let i = 2026; i >= 2020; i--) { years.push({ label: i.toString(), value: i.toString() }); }
-            
-            let months = monthNames.map((m, i) => {
-                let val = (i + 1).toString().padStart(2, '0');
-                return { label: m, value: val };
-            });
-
+            let years = []; for (let i = 2026; i >= 2020; i--) years.push({ label: i.toString(), value: i.toString() });
+            let months = monthNames.map((m, i) => { return { label: m, value: (i + 1).toString().padStart(2, '0') }; });
             let times = timeOptions.map(t => ({ label: t.label, value: t.val }));
 
             renderList('list-year', 'display-year', years, timeState.year, (val, label) => {
-                timeState.year = val;
-                updateActiveSelection('list-year', 'display-year', timeState.year, label);
-                updateDaysList();
-                triggerMapUpdate();
+                timeState.year = val; updateActiveSelection('list-year', 'display-year', timeState.year, label);
+                updateDaysList(); triggerMapUpdate();
             });
-
             renderList('list-month', 'display-month', months, timeState.month, (val, label) => {
-                timeState.month = val;
-                updateActiveSelection('list-month', 'display-month', timeState.month, label);
-                updateDaysList(); 
-                triggerMapUpdate();
+                timeState.month = val; updateActiveSelection('list-month', 'display-month', timeState.month, label);
+                updateDaysList(); triggerMapUpdate();
             });
-
             renderList('list-time', 'display-time', times, timeState.time, (val, label) => {
-                timeState.time = val;
-                updateActiveSelection('list-time', 'display-time', timeState.time, label);
+                timeState.time = val; updateActiveSelection('list-time', 'display-time', timeState.time, label);
                 triggerMapUpdate();
             });
-
             updateDaysList(); 
         }
-
         initTimeSelectors();
 
         function updateLegend() {
             var selectedParam = $('input[name="parameter"]:checked').val();
             var legBox = document.getElementById('dynamic-legend');
-            var legTitle = document.getElementById('leg-title');
-            var legTime = document.getElementById('leg-time');
-            var legVisual = document.getElementById('leg-visual');
-
-            // Hide legend and stop playback if no parameter is selected
-            if (selectedParam === 'none') {
-                legBox.style.display = 'none';
-                if (isPlaying) stopPlayback();
-                return;
-            }
+            if (selectedParam === 'none') { legBox.style.display = 'none'; if (isPlaying) stopPlayback(); return; }
 
             legBox.style.display = 'block';
-            
-            // Format Time (UTC / MYT)
             var mytTime = (parseInt(timeState.time) + 8) % 24;
-            var mytTimeStr = mytTime.toString().padStart(2, '0') + ':00';
-            legTime.innerText = `Date: ${timeState.year}-${timeState.month}-${timeState.day} | ${timeState.time}:00 UTC / ${mytTimeStr} MYT`;
+            document.getElementById('leg-time').innerText = `Date: ${timeState.year}-${timeState.month}-${timeState.day} | ${timeState.time}:00 UTC / ${mytTime.toString().padStart(2, '0')}:00 MYT`;
 
             let visualHtml = '';
-
-            // Inject custom styles/gradients based on parameter
             switch(selectedParam) {
                 case 'temp':
-                    legTitle.innerText = 'Temperature (850 hPa)';
-                    visualHtml = `
-                        <div class="legend-scale" style="background: linear-gradient(to right, #fff5f0, #fcbba1, #fb6a4a, #cb181d, #67000d);"></div>
-                        <div class="legend-labels"><span>Cool</span><span>Hot</span></div>
-                    `;
+                    document.getElementById('leg-title').innerText = 'Temperature (850 hPa)';
+                    visualHtml = `<div class="legend-scale" style="background: linear-gradient(to right, #fff5f0, #fcbba1, #fb6a4a, #cb181d, #67000d);"></div><div class="legend-labels"><span>Cool</span><span>Hot</span></div>`;
                     break;
                 case 'geo':
-                    legTitle.innerText = 'Geopotential Height';
-                    visualHtml = `
-                        <div class="legend-scale" style="background: linear-gradient(to right, #006837, #addd8e, #ffffcc, #41b6c4, #225ea8);"></div>
-                        <div class="legend-labels"><span>Low</span><span>High</span></div>
-                    `;
+                    document.getElementById('leg-title').innerText = 'Geopotential Height';
+                    visualHtml = `<div class="legend-scale" style="background: linear-gradient(to right, #006837, #addd8e, #ffffcc, #41b6c4, #225ea8);"></div><div class="legend-labels"><span>Low</span><span>High</span></div>`;
                     break;
                 case 'rain':
-                    legTitle.innerText = 'Specific Rain Water Content';
-                    visualHtml = `
-                        <div class="legend-scale" style="background: linear-gradient(to right, #f7fbff, #c6dbef, #6baed6, #2171b5, #08306b);"></div>
-                        <div class="legend-labels"><span>Light</span><span>Heavy</span></div>
-                    `;
+                    document.getElementById('leg-title').innerText = 'Specific Rain Water Content';
+                    visualHtml = `<div class="legend-scale" style="background: linear-gradient(to right, #f7fbff, #c6dbef, #6baed6, #2171b5, #08306b);"></div><div class="legend-labels"><span>Light</span><span>Heavy</span></div>`;
                     break;
                 case 'wind':
-                    legTitle.innerText = 'Wind Layer (Vectors)';
-                    visualHtml = `
-                        <div style="display:flex; align-items:center; gap: 10px; font-size:12px; margin-bottom:5px;">
-                            <span style="font-size:18px;">➔</span> 
-                            <span>Direction & Magnitude</span>
-                        </div>
-                        <div class="legend-labels"><span>Requires backend rendering</span></div>
-                    `;
+                    document.getElementById('leg-title').innerText = 'Wind Vectors (850 hPa)';
+                    visualHtml = `<div class="legend-scale" style="background: linear-gradient(to right, #3288bd, #66c2a5, #abdda4, #e6f598, #fee08b, #fdae61, #f46d43, #d53e4f);"></div><div class="legend-labels"><span>0 m/s</span><span>>35 m/s</span></div>`;
                     break;
             }
-            legVisual.innerHTML = visualHtml;
+            document.getElementById('leg-visual').innerHTML = visualHtml;
         }
 
-        // Playback Functions
         function startPlayback() {
             isPlaying = true;
             let playBtn = document.getElementById('play-btn');
-            playBtn.innerText = '⏸ Pause';
-            playBtn.classList.add('playing');
+            playBtn.innerText = '⏸ Pause'; playBtn.classList.add('playing');
             document.getElementById('play-status').innerText = 'Animating...';
             
             playInterval = setInterval(function() {
                 let currentDay = parseInt(timeState.day);
                 let maxDays = new Date(parseInt(timeState.year), parseInt(timeState.month), 0).getDate();
-                
-                // Increment day, loop back to 1 if end of month
-                if (currentDay < maxDays) {
-                    timeState.day = (currentDay + 1).toString().padStart(2, '0');
-                } else {
-                    timeState.day = '01'; 
-                }
-                
-                // Update UI visually
+                timeState.day = (currentDay < maxDays ? currentDay + 1 : 1).toString().padStart(2, '0');
                 updateActiveSelection('list-day', 'display-day', timeState.day, timeState.day);
                 triggerMapUpdate();
-            }, 1000); // 1000ms = 1 second per day
+            }, 1000); 
         }
 
         function stopPlayback() {
             isPlaying = false;
             let playBtn = document.getElementById('play-btn');
-            playBtn.innerText = '▶ Play Month';
-            playBtn.classList.remove('playing');
-            document.getElementById('play-status').innerText = '';
-            clearInterval(playInterval);
+            playBtn.innerText = '▶ Play Month'; playBtn.classList.remove('playing');
+            document.getElementById('play-status').innerText = ''; clearInterval(playInterval);
         }
 
         document.getElementById('play-btn').addEventListener('click', function() {
-            if (isPlaying) stopPlayback();
-            else startPlayback();
+            if (isPlaying) stopPlayback(); else startPlayback();
         });
 
         function triggerMapUpdate() {
-            updateStaticLayer();
-            updateWindLayer();
+            var y = timeState.year; var m = timeState.month; var d = timeState.day; var t = timeState.time;
+            var timeKey = `${y}${m}${d}_${t}`;
+            var selectedParam = $('input[name="parameter"]:checked').val();
+            var showAnim = $('#toggle-wind-anim').is(':checked');
+
+            if (currentImageLayer) { map.removeLayer(currentImageLayer); currentImageLayer = null; }
+
+            // Handle Static Maps (Non-Wind)
+            if (selectedParam !== 'none' && selectedParam !== 'wind') {
+                var imageUrl = `data/${selectedParam}_${timeKey}.png`;
+                currentImageLayer = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.65 }).addTo(map);
+            }
+
+            // Handle Dynamic Data (JSON needed for either animated particles or dynamic vectors)
+            if (selectedParam === 'wind' || showAnim) {
+                if (currentJSONTime !== timeKey) {
+                    $.getJSON(`data/wind_${timeKey}.json`, function(data) {
+                        currentJSONData = data; currentJSONTime = timeKey;
+                        applyWindLayers();
+                    }).fail(function() { console.error("Wind data missing for this timestamp"); clearWindLayers(); });
+                } else { applyWindLayers(); }
+            } else { clearWindLayers(); }
+
             updateLegend();
         }
 
-        function updateStaticLayer() {
-            var selectedParam = $('input[name="parameter"]:checked').val();
-            var y = timeState.year;
-            var m = timeState.month;
-            var d = timeState.day;
-            var t = timeState.time;
-
-            if (currentImageLayer) {
-                map.removeLayer(currentImageLayer);
-                currentImageLayer = null;
-            }
-
-            if (selectedParam !== 'none') {
-                var imageUrl = `data/${selectedParam}_${y}${m}${d}_${t}.png`;
-                currentImageLayer = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.65 });
-                currentImageLayer.addTo(map);
-            }
+        function clearWindLayers() {
+            if (customArrowLayer) { map.removeLayer(customArrowLayer); customArrowLayer = null; }
+            if (windVelocityLayer) { map.removeLayer(windVelocityLayer); windVelocityLayer = null; }
         }
 
-        function updateWindLayer() {
-            if (windVelocityLayer) {
-                map.removeLayer(windVelocityLayer);
-                windVelocityLayer = null;
+        function applyWindLayers() {
+            clearWindLayers();
+            if (!currentJSONData) return;
+            var selectedParam = $('input[name="parameter"]:checked').val();
+            var showAnim = $('#toggle-wind-anim').is(':checked');
+
+            if (selectedParam === 'wind') {
+                customArrowLayer = new L.CanvasWindArrowLayer(currentJSONData).addTo(map);
             }
-
-            if ($('#toggle-wind-anim').is(':checked')) {
-                var y = timeState.year;
-                var m = timeState.month;
-                var d = timeState.day;
-                var t = timeState.time;
-                
-                var jsonUrl = `data/wind_${y}${m}${d}_${t}.json`;
-
-                $.getJSON(jsonUrl, function (data) {
-                    windVelocityLayer = L.velocityLayer({
-                        displayValues: true,
-                        displayOptions: { velocityType: 'Wind', position: 'bottomleft' },
-                        data: data, maxVelocity: 25,
-                        colorScale: ["#3288bd", "#66c2a5", "#abdda4", "#e6f598", "#fee08b", "#fdae61", "#f46d43", "#d53e4f"]
-                    });
-                    windVelocityLayer.addTo(map);
-                }).fail(function() {
-                    console.error("Wind data for " + y + "-" + m + "-" + d + " at " + t + " UTC not generated yet.");
-                });
+            if (showAnim) {
+                windVelocityLayer = L.velocityLayer({
+                    displayValues: true, displayOptions: { velocityType: 'Wind', position: 'bottomleft' },
+                    data: currentJSONData, maxVelocity: 35,
+                    colorScale: ["#3288bd", "#66c2a5", "#abdda4", "#e6f598", "#fee08b", "#fdae61", "#f46d43", "#d53e4f"]
+                }).addTo(map);
             }
         }
 
         $('#toggle-crutem5').change(function() {
-            var isChecked = $(this).is(':checked');
             var legendBox = $('#crutem5-legend-box');
-            
-            if (isChecked) {
+            if ($(this).is(':checked')) {
                 legendBox.slideDown(200); 
-                
                 if (!crutem5KmlLayer) {
-                    var kmlUrl = 'CRUTEM5-2025-12_gridboxes.kml'; 
-                    
-                    crutem5KmlLayer = omnivore.kml(kmlUrl)
-                        .on('ready', function() {
-                            this.eachLayer(function(layer) {
-                                if (layer.feature && layer.feature.properties) {
-                                    var props = layer.feature.properties;
-                                    var popupHTML = '<div style="max-height: 150px; overflow-y: auto;"><b>Gridbox Info</b><br>';
-                                    for (var key in props) {
-                                        if (props.hasOwnProperty(key)) {
-                                            popupHTML += `<strong>${key}:</strong> ${props[key]}<br>`;
-                                        }
-                                    }
-                                    popupHTML += '</div>';
-                                    layer.bindPopup(popupHTML);
-                                }
-                            });
-                        })
-                        .on('error', function() {
-                            console.error('Error loading the CRUTEM5 KML file. Please check the file path.');
+                    crutem5KmlLayer = omnivore.kml('CRUTEM5-2025-12_gridboxes.kml').on('ready', function() {
+                        this.eachLayer(function(layer) {
+                            if (layer.feature && layer.feature.properties) {
+                                var props = layer.feature.properties;
+                                var popupHTML = '<div style="max-height: 150px; overflow-y: auto;"><b>Gridbox Info</b><br>';
+                                for (var key in props) if (props.hasOwnProperty(key)) popupHTML += `<strong>${key}:</strong> ${props[key]}<br>`;
+                                layer.bindPopup(popupHTML + '</div>');
+                            }
                         });
+                    });
                 }
                 map.addLayer(crutem5KmlLayer);
             } else {
-                legendBox.slideUp(200); 
-                if (crutem5KmlLayer) {
-                    map.removeLayer(crutem5KmlLayer);
-                }
+                legendBox.slideUp(200); if (crutem5KmlLayer) map.removeLayer(crutem5KmlLayer);
             }
         });
 
         $('input[name="basemap"]').change(function() {
-            if ($(this).val() === 'dark') { 
-                map.removeLayer(oceanMap); 
-                darkMap.addTo(map); 
-            } else { 
-                map.removeLayer(darkMap); 
-                oceanMap.addTo(map); 
-            }
+            if ($(this).val() === 'dark') { map.removeLayer(oceanMap); darkMap.addTo(map); } 
+            else { map.removeLayer(darkMap); oceanMap.addTo(map); }
         });
 
-        $('input[name="parameter"]').change(function() {
-            triggerMapUpdate(); // Call trigger Map update directly so legend switches immediately
-        });
-        
-        $('#toggle-wind-anim').change(updateWindLayer);
+        $('input[name="parameter"]').change(triggerMapUpdate);
+        $('#toggle-wind-anim').change(triggerMapUpdate);
 
     </script>
 </body>
