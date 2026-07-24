@@ -5,11 +5,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     
+    <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    
+    <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- Leaflet Velocity -->
     <script src="https://cdn.jsdelivr.net/npm/leaflet-velocity@1.6.0/dist/leaflet-velocity.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet-velocity@1.6.0/dist/leaflet-velocity.min.css"/>
+    
+    <!-- Leaflet Omnivore (For KML Support) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-omnivore/0.3.4/leaflet-omnivore.min.js"></script>
     
     <style>
         body, html { 
@@ -157,6 +165,25 @@
         .time-item:last-child { border-bottom: none; }
         .time-item:hover { background: #333; color: #fff; }
         .time-item.active { background: #4da6ff; color: #000; font-weight: bold; }
+
+        /* Legend styling for Section 5 */
+        #crutem5-legend-box {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(20, 20, 20, 0.8);
+            border-radius: 4px;
+            border: 1px solid #555;
+            font-size: 12px;
+            color: #ddd;
+            line-height: 1.4;
+        }
+
+        /* Popup styling for KML data */
+        .leaflet-popup-content {
+            color: #333;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -222,6 +249,18 @@
                 <h3>4. Wind Overlay</h3>
                 <label><input type="checkbox" id="toggle-wind-anim"> Animated Wind Particles (850 hPa)</label>
             </div>
+
+            <div class="panel-section">
+                <h3>5. Observation Data</h3>
+                <label><input type="checkbox" id="toggle-crutem5"> CRUTEM5 Gridboxes</label>
+                
+                <div id="crutem5-legend-box">
+                    <strong>CRUTEM5 Dataset</strong><br>
+                    <span style="color: #4da6ff;">■</span> Temperature Anomalies<br>
+                    <hr style="border: 0; border-top: 1px solid #444; margin: 8px 0;">
+                    <em>Click on any highlighted gridbox on the map to view detailed observation metrics.</em>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -257,6 +296,7 @@
 
         var currentImageLayer = null;
         var windVelocityLayer = null;
+        var crutem5KmlLayer = null; 
         var imageBounds = [[90, 0], [-90, 360]]; 
 
         let timeState = { year: '2026', month: '01', day: '01', time: '00' };
@@ -384,7 +424,6 @@
                 currentImageLayer = null;
             }
 
-            // FIX: Treats 'wind' just like the other images now!
             if (selectedParam !== 'none') {
                 var imageUrl = `data/${selectedParam}_${y}${m}${d}_${t}.png`;
                 currentImageLayer = L.imageOverlay(imageUrl, imageBounds, { opacity: 0.65 });
@@ -419,6 +458,49 @@
                 });
             }
         }
+
+        // CRUTEM5 KML Toggle Logic
+        $('#toggle-crutem5').change(function() {
+            var isChecked = $(this).is(':checked');
+            var legendBox = $('#crutem5-legend-box');
+            
+            if (isChecked) {
+                legendBox.slideDown(200); // Show legend
+                
+                if (!crutem5KmlLayer) {
+                    // Update this string with the exact file name in your repo
+                    var kmlUrl = 'CRUTEM5-2025-12_gridboxes.kml'; 
+                    
+                    crutem5KmlLayer = omnivore.kml(kmlUrl)
+                        .on('ready', function() {
+                            // Loop through the data to attach popups automatically based on KML properties
+                            this.eachLayer(function(layer) {
+                                if (layer.feature && layer.feature.properties) {
+                                    var props = layer.feature.properties;
+                                    var popupHTML = '<div style="max-height: 150px; overflow-y: auto;"><b>Gridbox Info</b><br>';
+                                    for (var key in props) {
+                                        if (props.hasOwnProperty(key)) {
+                                            // Format the KML attributes nicely
+                                            popupHTML += `<strong>${key}:</strong> ${props[key]}<br>`;
+                                        }
+                                    }
+                                    popupHTML += '</div>';
+                                    layer.bindPopup(popupHTML);
+                                }
+                            });
+                        })
+                        .on('error', function() {
+                            console.error('Error loading the CRUTEM5 KML file. Please check the file path.');
+                        });
+                }
+                map.addLayer(crutem5KmlLayer);
+            } else {
+                legendBox.slideUp(200); // Hide legend
+                if (crutem5KmlLayer) {
+                    map.removeLayer(crutem5KmlLayer);
+                }
+            }
+        });
 
         $('input[name="basemap"]').change(function() {
             if ($(this).val() === 'dark') { 
