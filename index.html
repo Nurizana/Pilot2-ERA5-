@@ -231,17 +231,27 @@
                         // Calculate angle mapped to standard screen orientation
                         var angle = Math.atan2(-v, u); 
                         
-                        // Calculate arrow length based on zoom + speed to prevent overlap
-                        var zoomBoost = (zoom - 4) * 1.5; 
-                        var arrowLen = Math.min(22, 6 + (zoomBoost > 0 ? zoomBoost : 0) + (speed * 0.25)); 
+                        // INCREASED ARROW LENGTH: Scaled up base length and multiplier for speed/zoom
+                        var zoomBoost = (zoom - 4) * 2; 
+                        var arrowLen = Math.min(35, 14 + (zoomBoost > 0 ? zoomBoost : 0) + (speed * 0.4)); 
                         
                         ctx.save();
                         ctx.translate(pos.x, pos.y); ctx.rotate(angle);
                         ctx.beginPath();
-                        ctx.moveTo(0, 0); ctx.lineTo(arrowLen, 0); 
-                        ctx.lineTo(arrowLen - 5, -4); ctx.moveTo(arrowLen, 0); ctx.lineTo(arrowLen - 5, 4);
                         
-                        ctx.strokeStyle = getColor(speed); ctx.lineWidth = 1.5; ctx.stroke();
+                        // CENTERED DRAWING: Draw the main line starting from -arrowLen/2 to +arrowLen/2
+                        ctx.moveTo(-arrowLen / 2, 0); 
+                        ctx.lineTo(arrowLen / 2, 0); 
+                        
+                        // Draw the arrowhead proportional to the new length
+                        ctx.lineTo((arrowLen / 2) - 7, -5); 
+                        ctx.moveTo(arrowLen / 2, 0); 
+                        ctx.lineTo((arrowLen / 2) - 7, 5);
+                        
+                        ctx.strokeStyle = getColor(speed); 
+                        // INCREASED ARROW THICKNESS: Changed from 1.5 to 2.5
+                        ctx.lineWidth = 2.5; 
+                        ctx.stroke();
                         ctx.restore();
                     }
                 }
