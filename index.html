@@ -82,6 +82,19 @@
         #play-btn { background: #4da6ff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; color: #000; transition: 0.2s; }
         #play-btn:hover { background: #66b5ff; }
         #play-btn.playing { background: #ff4d4d; color: white; }
+
+        /* Dark Tooltip styling for Grid */
+        .grid-tooltip {
+            background: rgba(20, 20, 20, 0.85);
+            color: #4da6ff;
+            border: 1px solid #444;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        .leaflet-tooltip-left.grid-tooltip::before { border-left-color: rgba(20, 20, 20, 0.85); }
+        .leaflet-tooltip-right.grid-tooltip::before { border-right-color: rgba(20, 20, 20, 0.85); }
+        .leaflet-tooltip-top.grid-tooltip::before { border-top-color: rgba(20, 20, 20, 0.85); }
+        .leaflet-tooltip-bottom.grid-tooltip::before { border-bottom-color: rgba(20, 20, 20, 0.85); }
     </style>
 </head>
 <body>
@@ -270,22 +283,26 @@
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}')
         ]);
 
-        // --- NEW: 5-Degree Grid Layer ---
+        // --- UPDATED: 5-Degree Grid Layer with Hover Popups and thicker lines ---
         var gridFeatures = [];
         for (var lat = -85; lat <= 85; lat += 5) {
-            gridFeatures.push(L.polyline([[lat, -180], [lat, 180]], {color: '#888', weight: 1, opacity: 0.6, interactive: false}));
+            var latLine = L.polyline([[lat, -180], [lat, 180]], {color: '#888', weight: 2, opacity: 0.6, interactive: true});
+            latLine.bindTooltip("Latitude: " + lat + "&deg;", {sticky: true, className: 'grid-tooltip'});
+            gridFeatures.push(latLine);
         }
         for (var lon = -180; lon <= 180; lon += 5) {
-            gridFeatures.push(L.polyline([[-90, lon], [90, lon]], {color: '#888', weight: 1, opacity: 0.6, interactive: false}));
+            var lonLine = L.polyline([[-90, lon], [90, lon]], {color: '#888', weight: 2, opacity: 0.6, interactive: true});
+            lonLine.bindTooltip("Longitude: " + lon + "&deg;", {sticky: true, className: 'grid-tooltip'});
+            gridFeatures.push(lonLine);
         }
         var gridLayer = L.layerGroup(gridFeatures);
 
-        // --- NEW: Vector Country Borders Layer (Crisp when zoomed in) ---
+        // --- UPDATED: High-Resolution, Darker Vector Country Borders Layer ---
         var bordersLayer = L.geoJSON(null, {
-            style: { color: '#ffffff', weight: 1.5, fillOpacity: 0, opacity: 0.5, interactive: false }
+            style: { color: '#777777', weight: 1.5, fillOpacity: 0, opacity: 0.7, interactive: false }
         });
-        // Fetch a generalized GeoJSON for country borders
-        $.getJSON('https://raw.githubusercontent.com/johan/world.geo.json/master/countries.geo.json', function(data) {
+        // Fetching smoother GeoJSON data from datasets/geo-countries
+        $.getJSON('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson', function(data) {
             bordersLayer.addData(data);
         });
 
@@ -380,9 +397,8 @@
 
             var legBox = document.getElementById('dynamic-legend');
             var legVisual = document.getElementById('leg-visual');
-            legVisual.innerHTML = ''; // Clear existing legend
+            legVisual.innerHTML = ''; 
 
-            // If absolutely nothing is turned on, hide the legend
             if (baseWeather === 'none' && !showGeo && !showWindVec && !showWindAnim && !showCrutem) {
                 legBox.style.display = 'none';
                 if (isPlaying) stopPlayback();
@@ -395,7 +411,6 @@
 
             let visualHtml = '';
 
-            // 1. Base Layer Legend
             if (baseWeather === 'temp') {
                 visualHtml += `
                 <div class="legend-block">
@@ -412,7 +427,6 @@
                 </div>`;
             }
 
-            // 2. Geopotential Overlay Legend
             if (showGeo) {
                 visualHtml += `
                 <div class="legend-block" style="display:flex; align-items:center; gap: 10px;">
@@ -421,7 +435,6 @@
                 </div>`;
             }
 
-            // 3. Wind Vectors Overlay Legend
             if (showWindVec || showWindAnim) {
                 visualHtml += `
                 <div class="legend-block">
@@ -431,7 +444,6 @@
                 </div>`;
             }
 
-            // 4. CRUTEM5 Legend
             if (showCrutem) {
                 visualHtml += `
                 <div class="legend-block" style="display:flex; align-items:center; gap: 10px;">
@@ -478,22 +490,18 @@
             var showWindVec = $('#toggle-wind-vec').is(':checked');
             var showWindAnim = $('#toggle-wind-anim').is(':checked');
 
-            // 1. Process Base Layer (Temperature or Rain)
             if (currentBaseImageLayer) { map.removeLayer(currentBaseImageLayer); currentBaseImageLayer = null; }
             if (baseWeather !== 'none') {
                 var baseImageUrl = `data/${baseWeather}_${timeKey}.png`;
                 currentBaseImageLayer = L.imageOverlay(baseImageUrl, imageBounds, { opacity: 0.65 }).addTo(map);
             }
 
-            // 2. Process Geopotential Layer (Line Overlay)
-            // Adding this AFTER the base layer ensures lines sit on top of the colors
             if (currentGeoOverlayLayer) { map.removeLayer(currentGeoOverlayLayer); currentGeoOverlayLayer = null; }
             if (showGeo) {
                 var geoImageUrl = `data/geo_${timeKey}.png`;
                 currentGeoOverlayLayer = L.imageOverlay(geoImageUrl, imageBounds, { opacity: 0.95 }).addTo(map);
             }
 
-            // 3. Process Dynamic Wind Layers
             if (showWindVec || showWindAnim) {
                 if (currentJSONTime !== timeKey) {
                     $.getJSON(`data/wind_${timeKey}.json`, function(data) {
@@ -548,7 +556,6 @@
             triggerMapUpdate();
         });
 
-        // --- NEW: Toggle listeners for Grid and Borders ---
         $('#toggle-grid').change(function() {
             if ($(this).is(':checked')) { map.addLayer(gridLayer); } 
             else { map.removeLayer(gridLayer); }
